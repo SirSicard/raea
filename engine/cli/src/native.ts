@@ -11,7 +11,7 @@ import { brandKit } from "./brand";
 import { readSite, stylesOf } from "./scrape";
 import { wordsOf } from "./heard";
 import { harness, library, show, task } from "./app";
-import { raeaHandler, type Engine, type Host } from "./index";
+import { AUDIO, raeaHandler, type Engine, type Host } from "./index";
 
 const [raea, ...args] = process.argv.slice(2);
 const cwd = process.cwd();
@@ -35,6 +35,7 @@ function engineRun(a: string[]): string {
 const engineJson = (a: string[]): any => JSON.parse(engineRun(a));
 
 const VIDEO = ["mp4", "mov", "m4v", "mkv", "webm"];
+const isAudio = (p: string) => AUDIO.includes(extname(p).slice(1).toLowerCase());
 
 /** Every take under media/: its path from the project's root */
 function takes(): string[] {
@@ -43,7 +44,7 @@ function takes(): string[] {
     for (const e of existsSync(at(dir)) ? readdirSync(at(dir), { withFileTypes: true }) : []) {
       const p = `${dir}/${e.name}`;
       if (e.isDirectory()) walk(p);
-      else if (VIDEO.includes(extname(e.name).slice(1).toLowerCase())) out.push(p);
+      else if (VIDEO.includes(extname(e.name).slice(1).toLowerCase()) || isAudio(e.name)) out.push(p);
     }
   };
   walk("media");
@@ -115,8 +116,9 @@ function hearTake(take: string, out: string) {
 function cutPlan(take: string, ws: Word[], lines: string[]): { plan: [number, number, string][]; notes: string[] } {
   const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}'\s]/gu, "");
   const toks = ws.map((w) => norm(w.text).trim());
-  const cuts = (engineJson(["media", "cuts", at(take), "--threshold", "0.08"]).cuts as { at: number }[]).map((c) => c.at);
-  const fps = (engineJson(["media", "probe", at(take)]).video?.fps as number) || 30;
+  // an audio take has no picture: no jump cuts to stay off, and the edit's 30 fps grid (`media cuts` refuses audio)
+  const cuts = isAudio(take) ? [] : (engineJson(["media", "cuts", at(take), "--threshold", "0.08"]).cuts as { at: number }[]).map((c) => c.at);
+  const fps = isAudio(take) ? 30 : (engineJson(["media", "probe", at(take)]).video?.fps as number) || 30;
   let from = 0;
   const spans: [number, number][] = [];
   const notes: string[] = [];

@@ -44,16 +44,20 @@ export interface Cut {
 }
 
 /** cuts.ts from the clips: data the edit imports (each take's file as a module, so the bundler finds the media). */
+/** audio-only takes (`raea cut`): a voice-over cut by its words, played as <Audio>; the edit's picture is the person's */
+export const AUDIO = ["wav", "mp3", "m4a", "aac", "flac", "aif", "aiff", "ogg", "opus"];
+
 export function cutsModule(clips: Cut[], edit: { width: number; height: number; fps: number }): string {
   const files = [...new Set(clips.map((c) => c.file))];
   const id = (f: string) => "m_" + f.replace(/\W/g, "_");
-  const rows = clips.map((c) => `  { take: ${JSON.stringify(c.take)}, src: ${id(c.file)}, from: ${c.from.toFixed(3)}, to: ${c.to.toFixed(3)}, line: ${JSON.stringify(c.line)} },`);
+  const kind = (f: string) => (AUDIO.includes(f.split(".").pop()!.toLowerCase()) ? "audio" : "video");
+  const rows = clips.map((c) => `  { take: ${JSON.stringify(c.take)}, src: ${id(c.file)}, kind: "${kind(c.file)}", from: ${c.from.toFixed(3)}, to: ${c.to.toFixed(3)}, line: ${JSON.stringify(c.line)} },`);
   return `// written by \`raea cut\`: the clips, in order, in each take's own seconds. Re-run raea cut to change them, or edit
 // by hand (the edit reads only this file). cuts.json beside it is the same list for raea's checks.
 ${files.map((f) => `import ${id(f)} from ${JSON.stringify("./" + f)};`).join("\n")}
 
 export const edit = ${JSON.stringify(edit)};
-export type Cut = { take: string; src: string; from: number; to: number; line: string };
+export type Cut = { take: string; src: string; kind?: "audio" | "video"; from: number; to: number; line: string };
 export const cuts: Cut[] = [
 ${rows.join("\n")}
 ];
