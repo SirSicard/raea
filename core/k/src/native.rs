@@ -1,10 +1,15 @@
 //! The render path's kernels as plain Rust, bit-equal to the K text (the CPU render, docs/cpu.feature C1).
 
 /// kernels/nv12.k as plain Rust, on `threads` threads (the CPU render, docs/cpu.feature C1): the same fixed-point
-/// formula per output word, the words split into bands; bit-equal.
+/// formula per output word (with the kernel's ordered dither), the words split into bands; bit-equal.
 pub fn nv12_cpu(rgba: &[u32], w: usize, h: usize, threads: usize) -> Vec<u32> {
     let ch = |c: u32, s: u32| ((c >> s) & 255) as i32;
-    let luma = |c: u32| (16 + ((47 * ch(c, 0) + 157 * ch(c, 8) + 16 * ch(c, 16) + 128) >> 8)).clamp(0, 255) as u32;
+    // the kernel's 4x4 ordered dither (in place of a fixed +128 / +512 rounding): 0..15 by (x, y) mod 4
+    let bayer = |x: usize, y: usize| -> i32 {
+        let e = (x & 3) ^ (y & 3);
+        (8 * (e & 1) + 4 * (y & 1) + 2 * ((e >> 1) & 1) + ((y >> 1) & 1)) as i32
+    };
+    let luma = |c: u32, x: usize, y: usize| (16 + ((47 * ch(c, 0) + 157 * ch(c, 8) + 16 * ch(c, 16) + 16 * bayer(x, y) + 8) >> 8)).clamp(0, 255) as u32;
     let (ny, nuv) = (w * h / 4, w * h / 8);
     let mut out = vec![0u32; ny + nuv + 1];
     let cw = w / 2;
@@ -13,7 +18,7 @@ pub fn nv12_cpu(rgba: &[u32], w: usize, h: usize, threads: usize) -> Vec<u32> {
             let p = 4 * j;
             let (y, x) = (p / w, p % w);
             let px = |d: usize| rgba[y * w + x + d];
-            return luma(px(0)) | luma(px(1)) << 8 | luma(px(2)) << 16 | luma(px(3)) << 24;
+            return luma(px(0), x, y) | luma(px(1), x + 1, y) << 8 | luma(px(2), x + 2, y) << 16 | luma(px(3), x + 3, y) << 24;
         }
         let j = j - ny;
         let mut wd = 0u32;
@@ -23,8 +28,9 @@ pub fn nv12_cpu(rgba: &[u32], w: usize, h: usize, threads: usize) -> Vec<u32> {
             let t = [rgba[2 * cr * w + 2 * cc], rgba[2 * cr * w + 2 * cc + 1], rgba[(2 * cr + 1) * w + 2 * cc], rgba[(2 * cr + 1) * w + 2 * cc + 1]];
             let sum = |sh: u32| t.iter().map(|c| ch(*c, sh)).sum::<i32>();
             let (r, g, b) = (sum(0), sum(8), sum(16));
-            let u = (128 + ((-26 * r - 87 * g + 112 * b + 512) >> 10)).clamp(0, 255) as u32;
-            let v = (128 + ((112 * r - 102 * g - 10 * b + 512) >> 10)).clamp(0, 255) as u32;
+            let q = 64 * bayer(cc, cr) + 32;
+            let u = (128 + ((-26 * r - 87 * g + 112 * b + q) >> 10)).clamp(0, 255) as u32;
+            let v = (128 + ((112 * r - 102 * g - 10 * b + q) >> 10)).clamp(0, 255) as u32;
             wd |= (u | v << 8) << (16 * k);
         }
         wd
@@ -212,6 +218,62 @@ pub fn composite_cpu_masked(bg: &[u32], w: usize, h: usize, planes: &[&[u8]], sl
         }
     });
     out
+}
+
+#[cfg(test)]
+mod nv12_tests {
+    use crate::*;
+    use std::collections::HashMap;
+
+    fn frame(w: usize, h: usize) -> Vec<u32> {
+        let mut s = 0x9e37_79b9_7f4a_7c15u64;
+        (0..w * (h + 1))
+            .map(|_| {
+                s ^= s << 13;
+                s ^= s >> 7;
+                s ^= s << 17;
+                (s as u32) | 0xff00_0000
+            })
+            .collect()
+    }
+
+    /// kernels/nv12.k and nv12buf.k (through the interpreter, which the GPU matches bit for bit) equal nv12_cpu.
+    #[test]
+    fn nv12_kernels_equal_native() {
+        let (w, h) = (64usize, 34usize);
+        let words = frame(w, h);
+        let sc: HashMap<&str, i32> = [("w", w as i32), ("h", h as i32), ("T_w", w as i32)].into();
+        let n = w * h / 4 + w * h / 8 + 1;
+        // nv12.k reads texture T (w wide, h + 1 rows); nv12buf.k reads buffer F and the tag from T
+        let cpu = Cpu { buffers: [("F", &words[..]), ("T", &words[..])].into(), scalars: sc };
+        let want = nv12_cpu(&words, w, h, 3);
+        for src in [include_str!("../kernels/nv12.k"), include_str!("../kernels/nv12buf.k")] {
+            let got = cpu.run(&parse(src).unwrap(), n, &["px"]).unwrap().into_iter().next().unwrap();
+            assert_eq!(got, want);
+        }
+    }
+
+    /// A slow dark ramp dithers to a mix of neighbouring codes whose mean tracks the ramp, where rounding gave flat steps.
+    #[test]
+    fn a_dark_ramp_keeps_its_mean_and_loses_its_steps() {
+        let (w, h) = (256usize, 16usize);
+        // grey 10.0 to 14.0 across the frame in 8.8 steps of the input: each input level a 64-px band
+        let f: Vec<u32> = (0..w * (h + 1)).map(|i| { let g = 10 + ((i % w) as u32) / 64; 0xff00_0000 | g << 16 | g << 8 | g }).collect();
+        let out = nv12_cpu(&f, w, h, 2);
+        let y: Vec<u8> = bytemuck_like(&out[..w * h / 4]);
+        // inside one input band the luma may take two codes (the dither) but its mean stays the rounded value
+        for band in 0..4 {
+            let vals: Vec<f64> = (0..h).flat_map(|r| (band * 64..band * 64 + 64).map(move |x| (r, x))).map(|(r, x)| y[r * w + x] as f64).collect();
+            let mean = vals.iter().sum::<f64>() / vals.len() as f64;
+            let g = (10 + band) as f64;
+            let exact = 16.0 + (47.0 * g + 157.0 * g + 16.0 * g) / 256.0;
+            assert!((mean - exact).abs() < 0.1, "band {band}: mean {mean} vs {exact}");
+        }
+    }
+
+    fn bytemuck_like(w: &[u32]) -> Vec<u8> {
+        w.iter().flat_map(|x| x.to_le_bytes()).collect()
+    }
 }
 
 #[cfg(test)]
