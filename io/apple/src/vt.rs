@@ -42,6 +42,8 @@ pub(crate) struct VtEncoder {
     pub(crate) own_pool: Option<(objc2_core_foundation::CFRetained<CVPixelBufferPool>, i32)>,
     /// HEVC Main10 from P010 (Backend::encoder_10bit)
     pub(crate) hevc10: bool,
+    /// the stall rescue in submit has run (its notice is printed once)
+    pub(crate) rescued: bool,
 }
 
 pub(crate) unsafe extern "C-unwind" fn vt_output(
@@ -232,7 +234,7 @@ impl VtEncoder {
                 }
                 None => None,
             };
-            Ok(VtEncoder { session, shared, out: out.to_path_buf(), opts: o.clone(), cap, n: 0, flush, own_pool, hevc10 })
+            Ok(VtEncoder { session, shared, out: out.to_path_buf(), opts: o.clone(), cap, n: 0, flush, own_pool, hevc10, rescued: false })
         }
     }
 
@@ -241,8 +243,48 @@ impl VtEncoder {
         let t0 = std::time::Instant::now();
         {
             let mut st = self.shared.st.lock().unwrap();
+            // Above 4096x2304 VideoToolbox silently gives H.264 to Apple's software encoder, which emits nothing until
+            // it holds ~13 frames: waiting for the oldest of `cap` in flight then never ends (the render hung with a
+            // misleading "gpu stall"). So a wait that sees no output for STALL completes the frames (what RAEA_VT_FLUSH
+            // does, but only when stuck), and one that sees none for GIVE_UP fails with the reason instead of hanging.
+            // hardware frames come out in ~20 ms at 4K (~70 ms for 8K HEVC); a full queue silent for 300 ms is holding frames
+            const STALL: std::time::Duration = std::time::Duration::from_millis(300);
+            const GIVE_UP: std::time::Duration = std::time::Duration::from_secs(60);
+            let waited = std::time::Instant::now();
             while st.inflight >= self.cap && st.err.is_none() {
-                st = self.shared.cv.wait(st).unwrap();
+                // once this encoder is known to hold frames, complete them as soon as the queue is full instead of
+                // waiting out STALL each time (software H.264 at 4608x2592)
+                if self.rescued {
+                    drop(st);
+                    unsafe { self.session.complete_frames(objc2_core_media::kCMTimeInvalid) };
+                    st = self.shared.st.lock().unwrap();
+                    if st.inflight < self.cap || st.err.is_some() {
+                        break;
+                    }
+                }
+                let before = st.inflight;
+                let (g, to) = self.shared.cv.wait_timeout(st, STALL).unwrap();
+                st = g;
+                if !to.timed_out() || st.inflight < before {
+                    continue;
+                }
+                if waited.elapsed() >= GIVE_UP {
+                    return Err(format!(
+                        "VideoToolbox: the encoder returned no frame for {} s with {} in flight ({}x{}); H.264 above 4096x2304 has no hardware encoder on this Mac: render with --10bit (HEVC) or a smaller frame",
+                        GIVE_UP.as_secs(), st.inflight, self.opts.width, self.opts.height
+                    ));
+                }
+                if !self.rescued {
+                    self.rescued = true;
+                    eprintln!(
+                        "raea encode: VideoToolbox is holding frames at {}x{} (no hardware H.264 above 4096x2304); completing frames as they queue, which is slower: --10bit encodes this size in hardware",
+                        self.opts.width, self.opts.height
+                    );
+                }
+                // completing frames runs the output callback, which takes this lock: let go of it meanwhile
+                drop(st);
+                unsafe { self.session.complete_frames(objc2_core_media::kCMTimeInvalid) };
+                st = self.shared.st.lock().unwrap();
             }
             if let Some(e) = st.err.take() {
                 return Err(e);
@@ -366,9 +408,19 @@ impl VideoEncoder for VtEncoder {
             self.session.complete_frames(objc2_core_media::kCMTimeInvalid);
         }
         {
+            // the frames are completed, so every one in flight comes out soon; a deadline turns a wedged encoder into
+            // an error rather than a hang
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
             let mut st = self.shared.st.lock().unwrap();
             while st.inflight > 0 && st.err.is_none() {
-                st = self.shared.cv.wait(st).unwrap();
+                let left = deadline.saturating_duration_since(std::time::Instant::now());
+                if left.is_zero() {
+                    let n = st.inflight;
+                    drop(st);
+                    unsafe { self.session.invalidate() };
+                    return Err(format!("VideoToolbox: {n} frames never came out of the encoder within 60 s of finishing"));
+                }
+                st = self.shared.cv.wait_timeout(st, left).unwrap().0;
             }
         }
         unsafe { self.session.invalidate() };
