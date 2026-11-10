@@ -246,6 +246,7 @@ pub(crate) fn render_bundle_with(js: &Path, dir: &Path, out: &Path, wanted: Opti
     }
     let fps = num(&conf, "fps").unwrap_or(30.0);
     let total = num(&conf, "frames").unwrap_or(60.0) as i64;
+    LENGTH.store(total, std::sync::atomic::Ordering::Relaxed);
     let wanted = wanted.unwrap_or_else(|| (0..total).collect());
     raea_gpu_device::check::mem_fits(w, h, None)?;
     let mut page = raea_runtime_page::BevyPage::new(w, h, dir)?;

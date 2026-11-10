@@ -67,11 +67,15 @@ pub(crate) struct Sound {
 /// `render --manifest PATH` (the CLI's; render_bundle keeps its signature for the iPhone): where render.json goes.
 static MANIFEST: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
 
+/// The composition's whole length in frames, as its first commit said (render_bundle_with), for the manifest's
+/// `length`: a render of a few stills still says how long the piece is (check --quick samples from it).
+static LENGTH: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
 /// The manifest, its folder made first (2D stills write it before their frames): boxes as drawn, findings, sounds.
 fn write_manifest(cx: &mut Ctx, (w, h, fps): (u32, u32, f64), found: Vec<raea_core_facts::Finding>, heard: impl FnOnce(&Ctx) -> Value) -> R<()> {
     let (Some(path), Some(frames)) = (MANIFEST.lock().unwrap().clone(), cx.manifest.take()) else { return Ok(()) };
     path.parent().map_or(Ok(()), std::fs::create_dir_all).map_err(|e| format!("{}: {e}", path.display()))?;
-    std::fs::write(&path, json!({"width": w, "height": h, "fps": fps, "frames": frames, "findings": raea_core_facts::finding::ranked(found), "sounds": heard(cx), "not_applied": not_applied::seen(), "layers": raea_sys_layers::finish(fps)}).to_string()).map_err(|e| format!("{}: {e}", path.display()))
+    std::fs::write(&path, json!({"width": w, "height": h, "fps": fps, "length": LENGTH.load(std::sync::atomic::Ordering::Relaxed), "frames": frames, "findings": raea_core_facts::finding::ranked(found), "sounds": heard(cx), "not_applied": not_applied::seen(), "layers": raea_sys_layers::finish(fps)}).to_string()).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// `render --stage WxH`: a responsive composition (one that lays out from useVideoConfig) laid out at a stage's size, as
