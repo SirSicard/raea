@@ -38,6 +38,13 @@ pub fn taste_dir() -> Option<PathBuf> {
 /// The .ts files `--taste` names: the file, or every .ts in the folder.
 pub fn taste_files(args: &[String]) -> Vec<PathBuf> {
     let Some(t) = flag(args, "--taste").map(PathBuf::from) else { return vec![] };
+    // the person's taste folder may not exist yet: the skill's own check line names ~/.raea/taste/taste.ts, so a fresh
+    // install checks without taste rather than refusing (any other missing path still refuses, naming it)
+    let in_taste_dir = |d: &Path| t == d || t.parent() == Some(d);
+    if !t.exists() && taste_dir().as_deref().is_some_and(in_taste_dir) {
+        eprintln!("note: no taste yet ({} doesn't exist); checking without the person's taste", t.display());
+        return vec![];
+    }
     if t.extension().is_some_and(|x| x == "ts") {
         return vec![t];
     }
