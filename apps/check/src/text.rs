@@ -244,12 +244,21 @@ pub(crate) fn cues(runs: &[Run], words: &[Word], issues: &mut Vec<Issue>, passed
     for r in runs {
         let shown: Vec<String> = r.text.split_whitespace().map(norm).filter(|t| !t.is_empty()).collect();
         let Some((k, i)) = shown.iter().enumerate().filter(|(_, t)| t.len() >= 3 && !SMALL.contains(&t.as_str())).find_map(|(k, t)| {
-            words.iter().enumerate().filter(|(_, w)| norm(&w.text) == *t && (w.start - r.from).abs() <= 2.0).min_by(|(_, a), (_, b)| (a.start - r.from).abs().total_cmp(&(b.start - r.from).abs())).map(|(i, _)| (k, i))
+            // a one-word card matches only a word said right by it: the same word said 2 s earlier is another moment
+            let near = if shown.len() == 1 { 0.75 } else { 2.0 };
+            words.iter().enumerate().filter(|(_, w)| norm(&w.text) == *t && (w.start - r.from).abs() <= near).min_by(|(_, a), (_, b)| (a.start - r.from).abs().total_cmp(&(b.start - r.from).abs())).map(|(i, _)| (k, i))
         }) else {
             continue;
         };
         // back over the words the text shows before it, while the voice says them in the same order just before
         let back = (1..=k.min(i)).take_while(|&n| norm(&words[i - n].text) == shown[k - n]).last().unwrap_or(0);
+        // a caption says what the voice says: at least half its words, in order, around the anchor. A card that only
+        // shares one word with another line ("Wirestock x OpenAI Sora" against "At Wirestock, I worked on...") isn't
+        // a caption of it, and holding it to that word's time was a false P1
+        let fwd = (1..).take_while(|&n| k + n < shown.len() && i + n < words.len() && norm(&words[i + n].text) == shown[k + n]).last().unwrap_or(0);
+        if (back + 1 + fwd) * 2 < shown.len() {
+            continue;
+        }
         let w = &words[i - back];
         let tok = norm(&w.text);
         checked += 1;
