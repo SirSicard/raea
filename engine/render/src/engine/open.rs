@@ -46,8 +46,7 @@ impl Engine {
             // quiet on a good run: bevy_log's "Could not set global logger" (raea_io_trace owns `log` in a play
             // or a render, and its records go there, as meant) and a pass-timing readback that missed a frame
             // (RenderDiagnosticsPlugin's "Failed to download render statistics buffer": one second's bevy_passes lost)
-            // and bevy_time's "did not receive the time from the render world" (raea drives Time by frame, with the
-            // render world in step on this thread)
+            // and bevy_time's "did not receive the time from the render world" (raea steps Time by frame)
             .set(bevy::log::LogPlugin { level: bevy::log::Level::WARN, filter: format!("{}bevy_log=off,bevy_asset::io::web=error,bevy_asset::io::source=error,fontdb=error,bevy_render::diagnostic::internal=error,bevy_time=error", bevy::log::DEFAULT_FILTER), ..default() })
             // glTF models (scene3d) load from the paths their rows name, which are the edit's files wherever they are.
             // Hot reload (Bevy's file_watcher, in the bevy-all build) only when asked, RAEA_BEVY_WATCH=1: a render or a

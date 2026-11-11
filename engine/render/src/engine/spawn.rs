@@ -59,8 +59,7 @@ pub(crate) fn spawn_camera(world: &mut World, e: Entity, vals: &BTreeMap<String,
                     // single-sampled prepass (compose.rs)
                     if has_3d && !preview() && !vals.contains_key("ssao") && !vals.contains_key("aa") && !vals.contains_key("outline") && !vals.contains_key("frame_looks") && !vals.contains_key("passes") { Msaa::default() } else { Msaa::Off },
                     Transform::from_xyz(g("x", 0.0), g("y", 2.0), g("z", 9.0)).looking_at(Vec3::new(g("look_x", 0.0), g("look_y", 1.0), g("look_z", 0.0)), Vec3::Y),
-                    // the shadow LOD origin: the scene camera draws into an image, not a window, so Bevy picked one
-                    // arbitrarily and warned on every 3D run ("no entity has ShadowLodOrigin")
+                    // the shadow LOD origin (drawing into an image, Bevy picked one and warned on every 3D run)
                     bevy::camera::ShadowLodOrigin,
                 ));
                 // three.js-style scenes (raea's 3D): a vertical field of view in degrees, and an ambient
