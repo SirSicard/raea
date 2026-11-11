@@ -413,3 +413,23 @@ fn a_colour_crossing_the_saturation_line_is_not_a_red_flash() {
     let found = flash_samples(180, 60.0, |f, _, _, _| if f * 5 * 2 / 60 % 2 == 0 { [100, 49, 0] } else { [100, 50, 0] });
     assert_eq!(found, None);
 }
+
+#[test]
+fn a_centred_line_in_a_full_width_box_is_judged_by_its_glyphs() {
+    // "centred" (7 chars, 40 px) in a 640-wide `left: 0; right: 0` box: the container touches both edges, the line doesn't
+    let mid = |align: &str, text: &str| json!({"fps": 30.0, "frames": [
+        {"frame": 0, "text": [{"text": text, "box": [0.0, 160.0, 640.0, 49.0], "size": 40.0, "align": align, "lines": 1}]},
+    ]});
+    let (mut issues, mut passed) = (vec![], vec![]);
+    text_rules(&text_runs(&mid("center", "centred")), None, 640.0, 360.0, None, None, &mut issues, &mut passed);
+    assert!(issues.iter().all(|i| i.rule != "safe-area"), "{:?}", issues.iter().map(|i| &i.says).collect::<Vec<_>>());
+    // a left-aligned line in the same box starts at x 0: in the zone, and the message says where
+    text_rules(&text_runs(&mid("left", "centred")), None, 640.0, 360.0, None, None, &mut issues, &mut passed);
+    let s: Vec<_> = issues.iter().filter(|i| i.rule == "safe-area").collect();
+    assert_eq!(s.len(), 1);
+    assert!(s[0].says.contains("at its left") && s[0].says.contains("box 0,160"), "{}", s[0].says);
+    // a line as wide as its box keeps the box (nothing to narrow): still in the zone
+    let mut issues = vec![];
+    text_rules(&text_runs(&mid("center", "a long centred line that fills the whole width")), None, 640.0, 360.0, None, None, &mut issues, &mut passed);
+    assert_eq!(issues.iter().filter(|i| i.rule == "safe-area").count(), 1);
+}

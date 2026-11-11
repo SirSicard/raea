@@ -61,7 +61,7 @@ pub(crate) fn text_runs(manifest: &Value) -> Vec<Run> {
         let mut next = Vec::new();
         for x in shown {
             let text = x["text"].as_str().unwrap_or("").trim().to_string();
-            let b = x["box"].as_array().map(|b| [0, 1, 2, 3].map(|i| b.get(i).and_then(Value::as_f64).unwrap_or(0.0))).unwrap_or([0.0; 4]);
+            let b = ink(x["box"].as_array().map(|b| [0, 1, 2, 3].map(|i| b.get(i).and_then(Value::as_f64).unwrap_or(0.0))).unwrap_or([0.0; 4]), x, &text);
             let k = key(&text);
             let found = open.iter().position(|r| {
                 let rk = key(&r.text);
@@ -90,6 +90,27 @@ pub(crate) fn text_runs(manifest: &Value) -> Vec<Run> {
     done.append(&mut open);
     done.sort_by(|a, b| a.from.total_cmp(&b.from));
     done
+}
+
+/// The box a text's glyphs can fill inside its block's box. The manifest gives the block container's rect, so a centred
+/// line in a full-width `left: 0; right: 0` div reads as touching both edges (a false safe-area P1 on the commonest
+/// centred title). With its alignment and size the line's width is bounded: 0.62 em a character (wider than most faces
+/// set, so a real overrun is never hidden), placed by `align`. A box no wider than that bound is kept as it is.
+pub(crate) fn ink(b: [f64; 4], x: &Value, text: &str) -> [f64; 4] {
+    let (size, lines) = (x["size"].as_f64().unwrap_or(0.0), x["lines"].as_f64().unwrap_or(1.0).max(1.0));
+    let longest = text.lines().map(|l| l.chars().count()).max().unwrap_or(0) as f64;
+    let chars = longest.max(text.chars().count() as f64 / lines);
+    let est = 0.62 * size * chars;
+    let [bx, by, bw, bh] = b;
+    if size <= 0.0 || est <= 0.0 || est >= bw {
+        return b;
+    }
+    match x["align"].as_str().unwrap_or("") {
+        "center" => [bx + (bw - est) / 2.0, by, est, bh],
+        "right" | "end" => [bx + bw - est, by, est, bh],
+        "left" | "start" | "justify" | "" => [bx, by, est, bh],
+        _ => b,
+    }
 }
 
 /// The share of the face's area a text may cover before it's a fault (@raea/video's proofBoxes keeps the same 8%)
@@ -169,7 +190,8 @@ pub(crate) fn text_rules(runs: &[Run], heard: Option<&[Word]>, w: f64, h: f64, s
             issues.push(Issue { rule: "clipped", p: 0, at: Some(r.from), says: format!("{q} runs off the frame (box {x:.0},{y:.0} {bw:.0}x{bh:.0} in {w:.0}x{h:.0}); fit it or break the line") });
         } else if r.boxes.iter().all(zoned) {
             unsafe_ += 1;
-            issues.push(Issue { rule: "safe-area", p: 1, at: Some(r.from), says: format!("{q} sits in the app's UI zone (keep {zt:.0} px top, {zb:.0} bottom, {zl:.0} left, {zr:.0} right clear)") });
+            let edges: Vec<&str> = [(y < zt, "top"), (y + bh > h - zb, "bottom"), (x < zl, "left"), (x + bw > w - zr, "right")].into_iter().filter(|(on, _)| *on).map(|(_, e)| e).collect();
+            issues.push(Issue { rule: "safe-area", p: 1, at: Some(r.from), says: format!("{q} sits in the app's UI zone at its {} (box {x:.0},{y:.0} {bw:.0}x{bh:.0} in {w:.0}x{h:.0}; keep {zt:.0} px top, {zb:.0} bottom, {zl:.0} left, {zr:.0} right clear)", edges.join(" and ")) });
         }
         let words = r.text.split_whitespace().count() as f64;
         let need = (0.3 * words).max(1.0);
