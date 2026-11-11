@@ -114,3 +114,13 @@ jobs:
         run: cargo check --locked -p raea-cli --tests
       - name: unit tests (the crates with no GPU or media device)
         run: cargo test --locked -p raea-io-media -p raea-core-fonts -p raea-native
+      # the checks, the CLI's help guards, specs, workspaces, tools and the K kernels (their GPU twins
+      # through the interpreter): none needs a GPU, and the check and CLI crates had the most tests and ran in none
+      - name: unit tests (check, CLI, specs, workspace, tools, kernels)
+        # raea-cli's skill tests read the raea-skills submodule (the checkout above doesn't fetch submodules)
+        # no debug info in the test builds: these crates link the engine, and full debug info filled the runner's disk
+        env:
+          CARGO_PROFILE_TEST_DEBUG: "0"
+        run: |
+          git submodule update --init skills
+          cargo test --locked -p raea-app-check -p raea-cli -p raea-core-brief -p raea-app-workspace -p raea-app-tools -p raea-core-k -p raea-bundle
