@@ -253,9 +253,10 @@ function begin(frame: number) {
 }
 
 /** The camera parts are picked through this frame (a PerspectiveCamera's or OrthographicCamera's props). */
-export function useCamera3d(camera: PickCamera) {
+export function useCamera3d(camera: PickCamera, active = true) {
   begin(useCurrentFrame());
-  scene.camera = camera;
+  // a camera not drawing this frame (<Camera3d is_active={false}>) isn't the one the pointer picks through
+  if (active) scene.camera = camera;
 }
 
 /** A part's handlers (its on* props) called for the frame's pointer events on it; `bounds` gives its shape's, in its

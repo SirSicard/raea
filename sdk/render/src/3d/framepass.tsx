@@ -21,9 +21,11 @@ export interface FramePassProps {
   wesl?: string;
   /** the same in plain WGSL */
   wgsl?: string;
-  /** up to 16, as a surface shader's (a file's: each var<uniform>, a struct's { field: value }) */
+  /** up to 16, as a surface shader's (a file's: each var<uniform>, a struct's { field: value }); each frame's own, so
+   * a camera's matrices, a time or a frame index handed in move through a render (each keeps its first frame's type) */
   uniforms?: Record<string, number | number[] | string | StorageValue>;
-  /** up to 4, as a surface shader's, each read with its own sampler */
+  /** up to 4, as a surface shader's, each read with its own sampler; the first frame's for the whole render (pick a
+   * layer of a texture array with a uniform to change what's read frame by frame) */
   textures?: Record<string, string | Record<string, unknown>>;
   /** shader defs, as a surface shader's */
   defs?: ShaderDefs;
@@ -44,7 +46,8 @@ export function FramePass(props: FramePassProps) {
   if (at !== undefined && at !== "before-tonemap" && at !== "after-tonemap") throw new TypeError(`FramePass: at is "before-tonemap" or "after-tonemap", got ${JSON.stringify(at)}`);
   if (prepass !== undefined && typeof prepass !== "boolean" && (typeof prepass !== "object" || prepass === null || Object.keys(prepass).some((k) => k !== "depth" && k !== "normal"))) throw new TypeError("FramePass: prepass is true or { depth, normal }");
   const spec = surfaceShader("FramePass", sh as Parameters<typeof surfaceShader>[1], PASS_HOOK, "fn shade(in: FullscreenVertexOutput) -> vec4<f32>, or its own @fragment");
-  return node3d("FramePass", { shader: { ...spec, ...(at ? { at } : {}), ...(prepass !== undefined ? { prepass } : {}) } });
+  // its uniforms also as their own prop, keyed frame by frame (the spec is the first frame's)
+  return node3d("FramePass", { shader: { ...spec, ...(at ? { at } : {}), ...(prepass !== undefined ? { prepass } : {}) }, uniforms: JSON.stringify(spec.uniforms ?? {}) });
 }
 
 /** A pass as written (raea-sys-framepass written.rs): its file, the texture that reads the frame, its images,

@@ -66,6 +66,17 @@ impl BlitzPage {
                 if let (Some(b), true) = (rect(n), a > 0.01) {
                     let at = node.attr(LocalName::from("data-raea-at")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
                     let mut v = json!({"src": src, "at": at, "box": [r(b.x), r(b.y), r(b.width), r(b.height)], "opacity": (a * 100.0).round() / 100.0});
+                    // how the picture fills its box (the CapCut export places a clip by it, docs/capcut.feature CC2a)
+                    if let Some(s) = node.primary_styles() {
+                        use style::computed_values::object_fit::T as Fit;
+                        v["fit"] = json!(match s.clone_object_fit() {
+                            Fit::Contain => "contain",
+                            Fit::Cover => "cover",
+                            Fit::Fill => "fill",
+                            Fit::None => "none",
+                            Fit::ScaleDown => "scale-down",
+                        });
+                    }
                     stamps(n, &mut v);
                     videos.push(v);
                 }
@@ -125,6 +136,22 @@ impl BlitzPage {
             }
             let mut t = json!({"text": words, "box": [r(b.x), r(b.y), r(w), r(h)], "opacity": (alpha(owner) * 100.0).round() / 100.0,
                 "color": color, "size": font.font_size.computed_size().px() as f64, "weight": font.font_weight.value() as f64, "align": align});
+            // where the letters are across the lines (each line's offset is its alignment's), as a box of its own: a
+            // centred line in a full-width box is tested by this, not the box (raea check's safe-area rule, #89)
+            if let Some(l) = node.element_data().and_then(|e| e.inline_layout_data.as_ref()) {
+                let (fl, scale) = (node.final_layout(), doc.viewport().scale() as f64);
+                let fx = b.width / (fl.size.width as f64).max(1e-6);
+                let (mut x0, mut x1) = (f64::MAX, f64::MIN);
+                for line in l.layout.lines() {
+                    let m = line.metrics();
+                    x0 = x0.min(m.offset as f64);
+                    x1 = x1.max((m.offset + m.advance) as f64);
+                }
+                if x1 > x0 {
+                    let left = b.x + ((fl.border.left + fl.padding.left) as f64 + x0 / scale) * fx;
+                    t["ink"] = json!([r(left), r(b.y), r((x1 - x0) / scale * fx), r(h)]);
+                }
+            }
             // its first named face and how many lines it was set on (docs/direction.feature DR1's Text)
             if let Some(f) = font.font_family.families.iter().find_map(|f| match f { style::values::computed::font::SingleFontFamily::FamilyName(n) => Some(n.name.to_string()), _ => None }) {
                 t["family"] = json!(f);

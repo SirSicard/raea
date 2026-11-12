@@ -208,8 +208,8 @@ A shader over the whole frame. Its source defines
 | `samplers` | `Record<string, SamplerSpec>` | a file's samplers by name |
 | `wesl` | `string` | the source in WESL (a superset of WGSL) |
 | `wgsl` | `string` | the same in plain WGSL |
-| `uniforms` | `Record<string, number \| number[] \| string \| StorageValue>` | up to 16, as a surface shader's (a file's: each var<uniform>, a struct's { field: value }) |
-| `textures` | `Record<string, string \| Record<string, unknown>>` | up to 4, as a surface shader's, each read with its own sampler |
+| `uniforms` | `Record<string, number \| number[] \| string \| StorageValue>` | up to 16, as a surface shader's (a file's: each var<uniform>, a struct's { field: value }); each frame's own, so a camera's matrices, a time or a frame index handed in move through a render (each keeps its first frame's type) |
+| `textures` | `Record<string, string \| Record<string, unknown>>` | up to 4, as a surface shader's, each read with its own sampler; the first frame's for the whole render (pick a layer of a texture array with a uniform to change what's read frame by frame) |
 | `defs` | `ShaderDefs` | shader defs, as a surface shader's |
 | `at` | `"before-tonemap" \| "after-tonemap"` | "after-tonemap" (display colours; the default) or "before-tonemap" (the HDR frame, after bloom) |
 | `prepass` | `boolean \| { depth?: boolean; normal?: boolean }` | the camera's depth and normal prepasses, for depth(uv) and normal(uv) (turns its multisampling off) |

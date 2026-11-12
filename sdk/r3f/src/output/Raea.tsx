@@ -59,7 +59,8 @@ export function Raea<P extends object>({ component: C, props, width, height, fps
     };
   }, [page, host, invalidate]);
 
-  const w = width ?? size.width, h = height ?? size.height;
+  // the composition's size in whole pixels (a canvas laid out by CSS can be a fraction wide; the clock takes integers)
+  const w = Math.max(1, Math.round(width ?? size.width)), h = Math.max(1, Math.round(height ?? size.height));
 
   useFrame((_state, dt) => {
     if (!root.current) return;

@@ -15,6 +15,7 @@ Read the files a task needs with `raea guide motion/NAME`, one or two at a time,
 |---|---|
 | starting a file, sizing it, picking compositions | `motion/compositions` |
 | deciding when things happen, cutting into scenes | `motion/timing` |
+| planning how shots cut into each other: hooks on the thirds, the eye carried through each cut | `motion/match-cuts` |
 | moving anything: entrances, exits, counters, push-ins | `motion/animating` |
 | cutting takes, framing a face, trimming, clip sound | `motion/footage` |
 | music beds, foley, gains, fades, the master | `motion/sound` (the music itself: `motion/music`) |

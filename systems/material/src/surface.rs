@@ -112,6 +112,17 @@ fn over(base: &StandardMaterial, s: &Surface) -> StandardMaterial {
     if has("depth_map") {
         m.depth_map = s.made.depth_map.clone();
     }
+    // real transmission (glass, a frosted veil), as a mesh's material takes it (maps.rs); before this a glass
+    // <StandardMaterial> re-covering a glb drew opaque
+    if has("transmission") {
+        m.specular_transmission = s.made.specular_transmission;
+    }
+    if has("ior") {
+        m.ior = s.made.ior;
+    }
+    if has("thickness") {
+        m.thickness = s.made.thickness;
+    }
     if has("fields") {
         super::fields::copy(&mut m, &s.made, &s.fields);
     }
@@ -174,6 +185,23 @@ mod tests {
     fn spec(material: Option<&str>, baked: bool) -> Surface {
         let made = Lightmap { image: Handle::default(), uv_rect: Rect::new(0.0, 0.0, 1.0, 1.0), bicubic_sampling: false };
         Surface { material: material.map(str::to_string), made: StandardMaterial::default(), given: Vec::new(), fields: Vec::new(), baked: baked.then(|| super::super::lightmap::Baked { mesh: "box".into(), made }) }
+    }
+
+    #[test]
+    fn transmission_ior_and_thickness_re_cover_a_glb_material() {
+        // a glass re-cover over an opaque glTF material: the three fields given land, the rest stay the glb's
+        let mut s = spec(None, false);
+        s.made.specular_transmission = 1.0;
+        s.made.ior = 1.3;
+        s.made.thickness = 0.03;
+        s.given = vec!["transmission".into(), "ior".into(), "thickness".into()];
+        let base = StandardMaterial { perceptual_roughness: 0.8, ..default() };
+        let m = over(&base, &s);
+        assert_eq!((m.specular_transmission, m.ior, m.thickness), (1.0, 1.3, 0.03));
+        assert_eq!(m.perceptual_roughness, 0.8);
+        // not given: the glb's own
+        let plain = over(&base, &spec(None, false));
+        assert_eq!(plain.specular_transmission, base.specular_transmission);
     }
 
     #[test]

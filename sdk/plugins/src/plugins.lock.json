@@ -29,7 +29,7 @@
     "bevy": {
       "crate": "bevy",
       "version": "v0.20.0",
-      "schema": "7ee33d32170af3cd"
+      "schema": "9698b34f185564e3"
     },
     "leafwing": {
       "crate": "leafwing-input-manager",

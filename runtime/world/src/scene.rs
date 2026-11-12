@@ -133,7 +133,7 @@ mod tests {
     use std::sync::Arc;
 
     fn item(kind: &'static str, props: Value, shape: Option<&str>, world: Mat4) -> Item {
-        Item { kind, props: Arc::new(props.as_object().cloned().unwrap_or_default()), shape: shape.map(Arc::from), material: None, world }
+        Item { kind, props: Arc::new(props.as_object().cloned().unwrap_or_default()), shape: shape.map(Arc::from), material: None, at: None, world }
     }
 
     #[test]

@@ -32,7 +32,7 @@ export class HTMLImageElement_ extends HTMLElement_ {
 /** video and audio: the source's size and duration as the host decoded them; currentTime, whose set seeks the host's
  *  decoder (`__seek`: the time and a count); play() and pause(), which start and stop the host's player (`__play`: on,
  *  the time, a count and loop; raea-runtime-js media_play.rs plays on the sound's clock, its frames this element's
- *  picture), and muted (`__muted`). The host's news keeps currentTime (`time`) and fires playing, timeupdate and ended;
+ *  picture), muted (`__muted`) and volume (`__volume`, 0..1). The host's news keeps currentTime (`time`) and fires playing, timeupdate and ended;
  *  play and pause fire here, as a browser fires them, when they're asked. */
 export class HTMLMediaElement_ extends HTMLElement_ {
   _media?: MediaNews;
@@ -45,6 +45,7 @@ export class HTMLMediaElement_ extends HTMLElement_ {
   _time = 0;
   _seeks = 0;
   _muted?: boolean;
+  _volume?: number;
   _playing = false;
   _plays = 0;
   /** the host told this element (a prop of its own beside its attributes) */
@@ -82,6 +83,7 @@ export class HTMLMediaElement_ extends HTMLElement_ {
       this._playing = true;
       this._ended = false;
       this._tell("__muted", this.muted);
+      if (this._volume !== undefined) this._tell("__volume", this._volume);
       this._tell("__play", [true, this._time >= (this.duration || Infinity) ? 0 : this._time, ++this._plays, this.loop]);
       dispatchDirect(this, new Event_("play", { bubbles: false }));
     }
@@ -127,6 +129,18 @@ export class HTMLMediaElement_ extends HTMLElement_ {
     this._muted = !!v;
     this._tell("__muted", this._muted);
     if (was !== this._muted) dispatchDirect(this, new Event_("volumechange", { bubbles: false }));
+  }
+  get volume() {
+    return this._volume ?? 1;
+  }
+  /** 0..1, as a browser's: outside it throws, as a browser's IndexSizeError does */
+  set volume(v: number) {
+    const x = Number(v);
+    if (!Number.isFinite(x) || x < 0 || x > 1) throw new RangeError(`The volume provided (${v}) is outside the range [0, 1].`);
+    if (x === this.volume && this._volume !== undefined) return;
+    this._volume = x;
+    this._tell("__volume", x);
+    dispatchDirect(this, new Event_("volumechange", { bubbles: false }));
   }
   get duration() {
     return this._media?.duration ?? NaN;

@@ -1,7 +1,7 @@
 ---
 title: "raea app"
 summary: "Run, check headless and package a desktop app written as one TSX file on @raea/ui."
-order: 6
+order: 7
 sources: ["engine/cli/src/cli.rs", "engine/rune/src/main.rs"]
 ---
 

@@ -24,6 +24,8 @@ raea-sys-layers = { path = "../../systems/layers" }
 raea-gpu-device = { path = "../../gpu/device" }
 raea-io-net = { path = "../../io/net" }
 raea-io-media = { path = "../../io/media", default-features = false, features = ["soft-audio", "apple"] }
+# render -o OUT.mov --alpha: the transparent movie (docs/capcut.feature CC1)
+raea-io-alpha = { path = "../../io/alpha" }
 raea-core-program = { path = "../../core/program" }
 raea-core-scene = { path = "../../core/scene" }
 raea-runtime-scene = { path = "../scene" }

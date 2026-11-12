@@ -3,7 +3,7 @@
 //! (`loadedmetadata`, `loadeddata`, `seeked`, `error`: sdk/ui's dom layer fires each at the element), and a video's
 //! frame is its picture, which its natural size is. Its poster shows until the first seek; with none, the frame does.
 //! A seek is the prop `__seek` ([time, n], set by the dom layer's `currentTime`); playing is `__play` ([on, time, n,
-//! loop], set by `play()` and `pause()`), and `__muted` the element's muted. Playing, the decoder's frames come on the
+//! loop], set by `play()` and `pause()`), `__muted` the element's muted and `__volume` its volume. Playing, the decoder's frames come on the
 //! source's clock (its sound's: raea-runtime-js media_play.rs), each a `time` news for the element's currentTime, with
 //! `timeupdate` four times a second as a browser's, `playing` once it's going, and `ended` at its end. raea-runtime-dom's
 //! page host keeps one `Medias` and syncs it after each commit.
@@ -39,6 +39,7 @@ pub struct Media {
     play: Option<Value>,
     playing: bool,
     muted: Option<bool>,
+    volume: Option<f64>,
     /// when the last `timeupdate` went
     told: Option<std::time::Instant>,
 }
@@ -70,7 +71,7 @@ pub fn sync(doc: &mut BaseDocument, nodes: &Nodes, medias: &mut Medias, out: &mu
             Some(m) if m.src == src && m.load == load => m,
             _ => {
                 let stream = (!src.is_empty()).then(|| raea_runtime_js::media_html::stream::open(&raea_sys_page::net::page_path(&src), video)).flatten();
-                medias.insert(id, Media { src, load, poster: None, seek: None, stream, video, loaded: false, seeking: None, seeked: false, duration: f64::NAN, frame: None, play: None, playing: false, muted: None, told: None });
+                medias.insert(id, Media { src, load, poster: None, seek: None, stream, video, loaded: false, seeking: None, seeked: false, duration: f64::NAN, frame: None, play: None, playing: false, muted: None, volume: None, told: None });
                 medias.get_mut(&id).unwrap()
             }
         };
@@ -85,6 +86,13 @@ pub fn sync(doc: &mut BaseDocument, nodes: &Nodes, medias: &mut Medias, out: &mu
                 st.ask(Cmd::Muted(v));
             }
             m.muted = muted;
+        }
+        let volume = props.and_then(|p| p.get("__volume")).and_then(Value::as_f64);
+        if m.volume != volume {
+            if let (Some(v), Some(st)) = (volume, m.stream.as_mut()) {
+                st.ask(Cmd::Volume(v as f32));
+            }
+            m.volume = volume;
         }
         if m.seek != seek {
             if let Some(t) = seek.as_ref().and_then(|v| v.get(0)).and_then(Value::as_f64)

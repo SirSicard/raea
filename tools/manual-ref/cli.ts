@@ -25,18 +25,18 @@ const verbs: Verb[] = JSON.parse(run(["help", "--json"])).verbs
 
 // the index's groups, in the order a reader meets them; every verb is in one
 const GROUPS: [string, string, string[]][] = [
-  ["Make", "Render, play and package what you wrote.", ["render", "play", "export-game", "bundle", "app", "run"]],
+  ["Make", "Render, play and package what you wrote.", ["render", "play", "export-game", "export", "bundle", "app", "run"]],
   ["Projects", "The workspace, its projects and what a project holds.", ["init", "workspace", "project", "controller", "spec", "part", "add", "brand", "library"]],
   ["Check", "What's wrong before anyone watches it.", ["check", "judge", "findings", "scene", "world", "solid", "next", "doctor", "hook", "traces"]],
   ["Footage", "Takes, cuts and the camera, from your own media.", ["media", "cut", "frame", "track", "splat", "mezz", "neural"]],
   ["Sound", "Music read, foley and instruments made on this machine.", ["song", "sounds", "sao", "tokensynth", "setup-audio"]],
-  ["Generate and 3D tools", "Generated media, physics bakes and Blender.", ["gen", "physics", "blender"]],
+  ["Generate and 3D tools", "Generated media, physics bakes, Blender and Godot.", ["gen", "physics", "blender", "godot"]],
   ["Agents and setup", "What an agent reads and shows the person, and the tools raea installs.", ["guide", "context", "notes", "show", "skill", "skills", "setup"]],
 ]
 const groupOf = new Map(GROUPS.flatMap(([g, , vs]) => vs.map((v, i) => [v, { g, i }] as const)))
 
 // a verb with its own parser lists its forms itself: that list is its usage
-const OWN_HELP: Record<string, string[]> = { media: ["media", "help"], gen: ["gen"], blender: ["blender"], physics: ["physics"] }
+const OWN_HELP: Record<string, string[]> = { media: ["media", "help"], gen: ["gen"], blender: ["blender"], godot: ["godot"], physics: ["physics"] }
 function ownHelp(v: string): string {
   return run(OWN_HELP[v] ?? [v]).replace(/^REFUSED\s+/, "").replace(/^usage:\s*/, "").split("\n").map((l) => l.replace(/^\s{7}(raea )/, "$1").trimEnd()).join("\n")
 }

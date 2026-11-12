@@ -28,7 +28,7 @@ export const KINDS: Record<string, { status: Status; three: string; note?: strin
   MeshStandardMaterial: { status: "drawn", three: "MeshStandardMaterial (maps, alpha modes, sides, uv transform, samplers)" },
   MeshPhysicalMaterial: { status: "drawn", three: "MeshPhysicalMaterial (clearcoat, transmission, ior, thickness, attenuation, anisotropy, specular)" },
   MeshBasicMaterial: { status: "drawn", three: "MeshBasicMaterial" },
-  ThreeShaderMaterial: { status: "engine", three: "a three.js shader run by raea's engine (raea-sys-three-shader)", note: "it came from three.js (a ShaderMaterial's GLSL or a node material's WGSL); exported back to three.js, the original material is the one to keep" },
+  ThreeShaderMaterial: { status: "drawn", three: "three's own ShaderMaterial from its GLSL, uniforms and samplers set each frame (a node material's WGSL is raea's engine's, drawn in its colour)", note: "it came from three.js (a ShaderMaterial's GLSL or a node material's WGSL); exported back to three.js, the original material is the one to keep" },
   MeshToonMaterial: { status: "near", three: "MeshToonMaterial with a gradient of its steps or bands", note: "raea's rim, highlight and ink outline are its own shader's: three's toon shades the bands only" },
   PerspectiveCamera: { status: "drawn", three: "PerspectiveCamera, or OrthographicCamera when `ortho`" },
   AmbientLight: { status: "drawn", three: "AmbientLight (units.ts)" },
@@ -70,6 +70,8 @@ export const KINDS: Record<string, { status: Status; three: string; note?: strin
   Compute: { status: "engine", three: "a WGSL compute pass runs in Bevy" },
   BevyComponent: { status: "engine", three: "a Bevy component (a gizmo's is drawn as lines)" },
   BevyResource: { status: "engine", three: "a Bevy resource" },
+  Skybox: { status: "engine", three: "not drawn: Bevy's cubemap sky, a .ktx2 (rgb9e5, zstd) three's KTX2Loader doesn't read", note: "an <Environment background> is the sky three draws" },
+  Lightmap: { status: "engine", three: "not drawn: a light bake on a Model's meshes, a .ktx2 sampled by their second UVs", note: "three's lightMap on uv1 could draw a PNG bake; raea's are .ktx2" },
   Entities: { status: "drawn", three: "a mesh per Mesh entity of World.scene() (its shape, a standard surface of its colour, roughness and metalness, world space), as the engine reads it" },
 };
 

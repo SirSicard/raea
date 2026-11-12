@@ -1,5 +1,5 @@
 // @raea/character/character: people. A character is an Anny body (sdk/raea/tools/anny/character.py writes one: a
-// skinned glb in the playtest's graph paper, its ink hull, and its skeleton) on CMU's 31-joint motion capture rig. Its
+// skinned glb in the playtest's graph paper, its ink hull, and its skeleton) on MakeHuman's game_engine rig (bones.ts). Its
 // pose comes from one place (a held pose, a clip at the frame's time, or the motion matcher), and goals on top of it
 // put its hands, feet, gaze and seat where the scene's things are, said in the scene's own terms ("the right hand on
 // the mouse, flat"), never in body-frame numbers.

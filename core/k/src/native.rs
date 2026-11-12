@@ -4,7 +4,12 @@
 /// formula per output word, the words split into bands; bit-equal.
 pub fn nv12_cpu(rgba: &[u32], w: usize, h: usize, threads: usize) -> Vec<u32> {
     let ch = |c: u32, s: u32| ((c >> s) & 255) as i32;
-    let luma = |c: u32| (16 + ((47 * ch(c, 0) + 157 * ch(c, 8) + 16 * ch(c, 16) + 128) >> 8)).clamp(0, 255) as u32;
+    // the 4x4 Bayer threshold of pixel (x, y): 0..15, in place of half-up rounding (nv12.k's d0..d3, dq0, dq1; #87)
+    let bayer = |x: usize, y: usize| -> i32 {
+        let (a, y) = ((x ^ y) as i32, y as i32);
+        (a & 1) << 3 | (y & 1) << 2 | (a & 2) | (y & 2) >> 1
+    };
+    let luma = |c: u32, x: usize, y: usize| (16 + ((47 * ch(c, 0) + 157 * ch(c, 8) + 16 * ch(c, 16) + 8 + 16 * bayer(x, y)) >> 8)).clamp(16, 235) as u32;
     let (ny, nuv) = (w * h / 4, w * h / 8);
     let mut out = vec![0u32; ny + nuv + 1];
     let cw = w / 2;
@@ -13,7 +18,7 @@ pub fn nv12_cpu(rgba: &[u32], w: usize, h: usize, threads: usize) -> Vec<u32> {
             let p = 4 * j;
             let (y, x) = (p / w, p % w);
             let px = |d: usize| rgba[y * w + x + d];
-            return luma(px(0)) | luma(px(1)) << 8 | luma(px(2)) << 16 | luma(px(3)) << 24;
+            return luma(px(0), x, y) | luma(px(1), x + 1, y) << 8 | luma(px(2), x + 2, y) << 16 | luma(px(3), x + 3, y) << 24;
         }
         let j = j - ny;
         let mut wd = 0u32;
@@ -23,8 +28,9 @@ pub fn nv12_cpu(rgba: &[u32], w: usize, h: usize, threads: usize) -> Vec<u32> {
             let t = [rgba[2 * cr * w + 2 * cc], rgba[2 * cr * w + 2 * cc + 1], rgba[(2 * cr + 1) * w + 2 * cc], rgba[(2 * cr + 1) * w + 2 * cc + 1]];
             let sum = |sh: u32| t.iter().map(|c| ch(*c, sh)).sum::<i32>();
             let (r, g, b) = (sum(0), sum(8), sum(16));
-            let u = (128 + ((-26 * r - 87 * g + 112 * b + 512) >> 10)).clamp(0, 255) as u32;
-            let v = (128 + ((112 * r - 102 * g - 10 * b + 512) >> 10)).clamp(0, 255) as u32;
+            let d = 32 + 64 * bayer(2 * cc, 2 * cr);
+            let u = (128 + ((-26 * r - 87 * g + 112 * b + d) >> 10)).clamp(16, 240) as u32;
+            let v = (128 + ((112 * r - 102 * g - 10 * b + d) >> 10)).clamp(16, 240) as u32;
             wd |= (u | v << 8) << (16 * k);
         }
         wd

@@ -1,0 +1,27 @@
+// raea cloud on Cloudflare Containers (worker.ts). From sdk/cloud/deploy/cloudflare, after `npm install`:
+//
+//   npx wrangler secret put RAEA_CLOUD_TOKEN           # openssl rand -hex 32
+//   npx wrangler r2 bucket create raea-cloud-home
+//   npx wrangler secret put RAEA_CLOUD_STATE           # https://ACCOUNT_ID.r2.cloudflarestorage.com/raea-cloud-home/home.tar.zst
+//   npx wrangler secret put RAEA_CLOUD_STATE_KEY       # an R2 API token's access key id, scoped to that bucket
+//   npx wrangler secret put RAEA_CLOUD_STATE_SECRET    # and its secret
+//   npx wrangler deploy                                # builds image/Dockerfile (RAEA_VERSION and AGENTS: its defaults)
+{
+  "name": "raea-cloud",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "containers": [
+    {
+      "class_name": "RaeaCloud",
+      "image": "../../image/Dockerfile",
+      "image_build_context": "../..",
+      // 4 vCPU, 12 GiB, 20 GB of disk: raea renders on the CPU here
+      "instance_type": "standard-4",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": { "bindings": [{ "name": "RAEA", "class_name": "RaeaCloud" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RaeaCloud"] }],
+  "vars": { "RAEA_AGENT": "kimi-code" },
+  "observability": { "enabled": true }
+}

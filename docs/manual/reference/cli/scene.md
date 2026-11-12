@@ -22,6 +22,7 @@ raea scene light film.tsx --composition shot1,shot2,shot3     # the light across
 ## Usage
 
 ```sh
+raea scene export EDIT.tsx -o DIR [--composition ID] [--frame N | --at A-B]   (the composition's 3D as data other tools build: DIR/scene.json, each part placed (y up, metres) with its shape, material or light, and the camera; meshes/ and models/ beside it)
 raea scene lint|explain|light EDIT.tsx [--composition ID] [--frame N] [--part NAME] [--json]   (what each 3D part rests on: floating, sunk and clipping parts; light: the scene's lighting)
 ```
 
@@ -31,10 +32,12 @@ Headless: it needs nothing running and opens no window. Takes up to 2 arguments 
 
 | Flag | Takes | What it does |
 | --- | --- | --- |
+| `--at` | `A-B` | `export`: each part's placement and the camera's field of view on every frame from A to B, for keyframes in Blender or Godot. |
 | `--composition` | `ID` | Which composition to measure. `light` takes several, comma-separated, to compare the light across their cuts. |
 | `--frame` | `N` | The frame to measure (0 by default; `light` also takes `last`). |
 | `--json` | – | Print as JSON: `lint` its findings (check, level, the parts they are about, frames, says, measure, fix), `explain` every part with its support, gap and box. |
 | `--part` | `NAME` | With `light`: the part to meter, in place of the shot's subject. |
+| `-o` | `DIR` | `export`: the folder scene.json is written to, with meshes/ and models/ beside it. |
 
 <!-- generated:end -->
 

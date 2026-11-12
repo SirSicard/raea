@@ -19,8 +19,9 @@ export interface InstancesProps {
   /** a glTF file drawn at every placement: staticFile("models/house.glb"). Without it, a geometry child (or `shape`)
    * and a material child draw a mesh at every placement */
   src?: string;
-  /** where each copy stands. Fixed for the shot: the first frame's list is drawn on every frame (move, turn, scale,
-   * hide or recolour the whole set by the Instances' own props) */
+  /** where each copy stands, this frame: a list that changes moves the copies with it (each distinct list is kept, so a
+   * set of thousands moving every frame costs a list a frame; moving the whole set by the Instances' own props costs
+   * nothing). How many copies is the first frame's: a frame with another count holds the list before it */
   at: Instance[];
   /** the entity's name, for picking, the inspector and world.* */
   name?: string;
@@ -86,13 +87,16 @@ export function Instances(props: InstancesProps) {
   checkPass(owner, props.pass);
   const at = packInstances(owner, props.at);
   const { position = [0, 0, 0], rotation = [0, 0, 0], scale = 1 } = props;
-  if (props.src !== undefined) return node3d("Model", { ...props, shape: undefined, at, position, rotation, scale }, props.children);
+  // the placements in an attribute of their own, not data-props: the engine shares one list across frames while its text
+  // is the same, where a set whose other props change was parsed whole into each frame's props (#84)
+  const placed = { "data-at": JSON.stringify(at) };
+  if (props.src !== undefined) return node3d("Model", { ...props, shape: undefined, at: undefined, position, rotation, scale }, props.children, placed);
   const manifold = props.shape instanceof Solid ? props.shape.expr : props.shape ?? shapeFromChildren(props.children);
   if (manifold === undefined) throw new TypeError("Instances: give a glTF `src`, or a geometry child (<Cuboid />, <BufferMesh />, ...) or `shape`");
   let toon = false;
   Children.forEach(props.children, (c) => { if (isValidElement(c) && c.type === MeshToonMaterial) toon = true; });
   if (toon) throw new TypeError("Instances: the copies take a MeshStandardMaterial, MeshPhysicalMaterial or MeshBasicMaterial (a toon surface isn't instanced)");
-  return node3d("Mesh", { ...props, shape: undefined, at, position, rotation, scale }, props.children, { "data-shape": manifold as string });
+  return node3d("Mesh", { ...props, shape: undefined, at: undefined, position, rotation, scale }, props.children, { ...placed, "data-shape": manifold as string });
 }
 
 /** A box on the plan (x, z, metres): the room SDK's Footprint, or any { min, max }. */

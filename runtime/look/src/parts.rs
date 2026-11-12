@@ -117,6 +117,29 @@ pub fn srcs_of(its: &[Item]) -> Vec<String> {
     }).collect()
 }
 
+/// A screen's columns (<Screen>, <Model screens>): its spec (a panel's `screen`) or a model's `screens` and `hide`,
+/// JSON, from the first frame; the tube's power keyed when it changes.
+pub fn screen_columns(p: &mut Program, row: &mut BTreeMap<String, V>, id: &str, its: &[Item]) {
+    let first = &its[0].props;
+    for (k, col) in [("screen", "screen"), ("screens", "screens"), ("hide", "hide")] {
+        if let Some(v) = first.get(k).filter(|v| !v.is_null()) {
+            row.insert(col.into(), V::S(v.to_string()));
+        }
+    }
+    if its.iter().any(|i| i.props.contains_key("screenPower")) {
+        column(p, row, id, "screen_power", &its.iter().map(|i| n(&i.props, "screenPower", 1.0)).collect::<Vec<_>>());
+    }
+    // a flat screen's brightness over the frames (the spec holds the first; engine/screen.rs's sync_screens reads this)
+    if its.iter().any(|i| screen_bright(&i.props).is_some()) {
+        column(p, row, id, "screen_bright", &its.iter().map(|i| screen_bright(&i.props).unwrap_or(1.0)).collect::<Vec<_>>());
+    }
+}
+
+/// A flat screen's `brightness`, from its spec (Screen's prop)
+pub fn screen_bright(props: &Map<String, Value>) -> Option<f64> {
+    props.get("screen")?.get("brightness")?.as_f64()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,7 +148,7 @@ mod tests {
     /// cells (the grid was the first frame's: 0.1.1's showreel, 11-10).
     #[test]
     fn a_sheets_grid_is_keyed() {
-        let plane = |grid: [u32; 2], frame: u32| Item { kind: "panel", props: std::sync::Arc::new(serde_json::json!({"grid": grid, "frame": frame}).as_object().unwrap().clone()), shape: None, material: None, world: Default::default() };
+        let plane = |grid: [u32; 2], frame: u32| Item { kind: "panel", props: std::sync::Arc::new(serde_json::json!({"grid": grid, "frame": frame}).as_object().unwrap().clone()), shape: None, material: None, at: None, world: Default::default() };
         let (mut p, mut row) = (Program::default(), BTreeMap::new());
         sheet(&mut p, &mut row, "plane0", &[plane([2, 1], 0), plane([1, 2], 1)]);
         let keyed = |c: &str| p.keys.get(&("plane0".to_string(), c.to_string())).map(|k| k.iter().map(|(f, v, _)| (*f, *v)).collect::<Vec<_>>());

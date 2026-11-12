@@ -27,7 +27,7 @@ use bevy::render::{
     view::{ExtractedView, ViewTarget},
     Render, RenderApp, RenderStartup, RenderSystems,
 };
-use raea_sys_material::shader_material::{SLOTS, TEXTURES};
+use raea_sys_material::shader_material::{uniform, SLOTS, TEXTURES};
 use raea_sys_shader::{accessors, defines, register, Inputs};
 use serde_json::Value;
 
@@ -52,6 +52,45 @@ pub struct Pass {
     pub array: Option<Handle<Image>>,
     /// a pass as written (a <FramePass file>): its own bindings (written.rs)
     pub written: Option<written::Written>,
+    /// an inline pass's uniforms, followed frame by frame (`follow`)
+    pub inline: Option<Inline>,
+}
+
+/// An inline pass's row and its uniforms' names and types in slot order: `follow` puts each frame's values in its
+/// slots, as a pass as written's are (until 11-11 an inline pass kept its first frame's uniforms for a whole render:
+/// a camera's matrices or a time handed in stood still).
+#[derive(Clone, Debug, Default)]
+pub struct Inline {
+    pub id: String,
+    pub names: Vec<(String, &'static str)>,
+    last: String,
+}
+
+impl Inline {
+    pub fn new(names: Vec<(String, &'static str)>) -> Inline {
+        Inline { id: String::new(), names, last: String::new() }
+    }
+
+    /// This frame's uniforms (JSON, {NAME: value}) into `slots` when they've changed; whether they had. A uniform the
+    /// frame leaves out keeps its value; one whose type changes is refused, the module being built for the first
+    /// frame's.
+    pub fn follow(&mut self, uniforms: &str, slots: &mut [Vec4; SLOTS]) -> Result<bool, String> {
+        if uniforms == self.last {
+            return Ok(false);
+        }
+        let v: Value = serde_json::from_str(uniforms).map_err(|e| format!("its uniforms: {e}"))?;
+        let o = v.as_object().ok_or_else(|| format!("its uniforms are {{name: value}}, got {v}"))?;
+        for (i, (name, ty)) in self.names.iter().enumerate() {
+            let Some(x) = o.get(name) else { continue };
+            let u = uniform(name, x)?;
+            if u.ty != *ty {
+                return Err(format!("uniform {name} is a {ty} (its first frame's), got a {}", u.ty));
+            }
+            slots[i] = u.value;
+        }
+        self.last = uniforms.to_string();
+        Ok(true)
+    }
 }
 
 /// The camera's passes, in order.
@@ -110,7 +149,7 @@ pub fn build(world: &mut World, v: &Value, mut image: impl FnMut(&mut World, &Va
     };
     if o.contains_key("file") {
         let (shader, w) = written::build(world, o, &mut image)?;
-        return Ok(Pass { shader, at, prepass: false, slots: [Vec4::ZERO; SLOTS], textures: vec![], array: None, written: Some(w) });
+        return Ok(Pass { shader, at, prepass: false, slots: [Vec4::ZERO; SLOTS], textures: vec![], array: None, written: Some(w), inline: None });
     }
     let ins = Inputs::read(world, o, "a frame pass", &mut image)?;
     if !(ins.src.contains("@fragment") || defines(&ins.src, "shade")) {
@@ -124,7 +163,8 @@ pub fn build(world: &mut World, v: &Value, mut image: impl FnMut(&mut World, &Va
     };
     let (names, tnames) = ins.names();
     let shader = register(world, module(&ins.src, &names, &tnames, ins.array.as_ref().map(|a| a.0.as_str()), prepass), &ins.defs, "raea frame pass", "raea_sys_framepass");
-    Ok(Pass { shader, at, prepass, slots: ins.slots(), textures: ins.textures.into_iter().map(|t| t.1).collect(), array: ins.array.map(|a| a.1), written: None })
+    let inline = Some(Inline::new(names));
+    Ok(Pass { shader, at, prepass, slots: ins.slots(), textures: ins.textures.into_iter().map(|t| t.1).collect(), array: ins.array.map(|a| a.1), written: None, inline })
 }
 
 /// The passes onto a camera: with a prepass, its depth and normal prepasses on and its multisampling off (a
@@ -147,18 +187,28 @@ pub fn install(app: &mut App) {
     render_app.add_systems(Core3d, (draw::<true>.before(tonemapping), draw::<false>.after(tonemapping)).in_set(Core3dSystems::PostProcess));
 }
 
-/// Each pass as written's uniforms from its row's keyed `uniforms` this frame (a bad one is logged); the camera's
-/// passes marked changed only when one has, so they're extracted again.
+/// Each pass's uniforms from its row's keyed `uniforms` this frame, as written or inline (a bad one is logged); the
+/// camera's passes marked changed only when one has, so they're extracted again.
 fn follow(frame: Option<Res<raea_sys_frame::FrameRows>>, mut cams: Query<&mut FramePasses>) {
     let Some(frame) = frame else { return };
     let cols = &frame.cols;
     for mut passes in &mut cams {
         let mut changed = false;
-        for w in passes.bypass_change_detection().0.iter_mut().filter_map(|p| p.written.as_mut()) {
-            let Some(r) = cols.id.iter().position(|i| *i == w.id) else { continue };
-            match w.follow(&raea_sys_frame::keyed(|c| frame.at(r, c), "uniforms").unwrap_or_default()) {
-                Ok(c) => changed |= c,
-                Err(e) => error!("FramePass {}: {e}", w.id),
+        for pass in passes.bypass_change_detection().0.iter_mut() {
+            let Pass { written, inline, slots, .. } = pass;
+            if let Some(w) = written.as_mut() {
+                let Some(r) = cols.id.iter().position(|i| *i == w.id) else { continue };
+                match w.follow(&raea_sys_frame::keyed(|c| frame.at(r, c), "uniforms").unwrap_or_default()) {
+                    Ok(c) => changed |= c,
+                    Err(e) => error!("FramePass {}: {e}", w.id),
+                }
+            } else if let Some(i) = inline.as_mut() {
+                let Some(r) = cols.id.iter().position(|x| *x == i.id) else { continue };
+                let Some(u) = raea_sys_frame::keyed(|c| frame.at(r, c), "uniforms") else { continue };
+                match i.follow(&u, slots) {
+                    Ok(c) => changed |= c,
+                    Err(e) => error!("FramePass {}: {e}", i.id),
+                }
             }
         }
         if changed {
@@ -358,5 +408,20 @@ mod tests {
         assert!(!m.contains("fn depth(") && m.contains("return shade(in);"));
         let d = module("@fragment fn f(in: FullscreenVertexOutput) -> @location(0) vec4<f32> { return vec4(depth(in.uv)); }", &[], &[], None, true);
         assert!(d.contains("fn depth(") && d.contains("fn normal(") && !d.contains("raea_frame_pass("));
+    }
+
+    #[test]
+    fn an_inline_pass_follows_its_uniforms_frame_by_frame() {
+        // a render's frames each hand the pass their own values (a camera, a time): they were the first frame's
+        let mut i = Inline::new(vec![("k".into(), "f32"), ("eye".into(), "vec3<f32>")]);
+        let mut slots = [Vec4::ZERO; SLOTS];
+        assert_eq!(i.follow(r#"{"k": 0.5, "eye": [1, 2, 3]}"#, &mut slots), Ok(true));
+        assert_eq!((slots[0].x, slots[1]), (0.5, Vec4::new(1.0, 2.0, 3.0, 0.0)));
+        // the same values again change nothing; one left out keeps its value
+        assert_eq!(i.follow(r#"{"k": 0.5, "eye": [1, 2, 3]}"#, &mut slots), Ok(false));
+        assert_eq!(i.follow(r#"{"k": 0.75}"#, &mut slots), Ok(true));
+        assert_eq!((slots[0].x, slots[1].z), (0.75, 3.0));
+        // its type is its first frame's
+        assert!(i.follow(r#"{"k": [1, 2]}"#, &mut slots).is_err());
     }
 }

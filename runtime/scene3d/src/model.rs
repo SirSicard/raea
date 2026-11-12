@@ -15,6 +15,10 @@ pub fn model(world: &mut World, e: Entity, t: &Tup, inserted: &[Tup], dir: &Path
     let shaders = super::model_shaders(t)?;
     let sampler = raea_sys_sampler::Sampling::col(&t.vals, "sampler").map_err(|e| format!("model {}: {e}", t.id))?;
     let inst = model_placements(t)?;
+    // placements that change over the shot: moved by sync_instances once the scene is copied to them
+    if inst.is_some() {
+        world.entity_mut(e).insert(Placements::of(t));
+    }
     // `shadow={false}`, `receiveShadow={false}`: on the model, then on each of its meshes once spawned (model_shadow_markers)
     if t.vals.get("shadow").is_some_and(|v| !v.truthy()) {
         world.entity_mut(e).insert(bevy::light::NotShadowCaster);

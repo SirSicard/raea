@@ -296,7 +296,7 @@ mod tests {
     use super::*;
 
     fn item(kind: &'static str, props: Value) -> Item {
-        Item { kind, props: std::sync::Arc::new(props.as_object().cloned().unwrap_or_default()), shape: None, material: None, world: Default::default() }
+        Item { kind, props: std::sync::Arc::new(props.as_object().cloned().unwrap_or_default()), shape: None, material: None, at: None, world: Default::default() }
     }
 
     #[test]

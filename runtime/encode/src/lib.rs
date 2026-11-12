@@ -67,7 +67,7 @@ fn push_direct(enc: &mut Box<dyn raea_io_media::VideoEncoder>, px: &[u8], w: u32
 
 /// Render an edit file (.sql or .rdb) to OUT: .mp4 (video and its sound), .txt (one hash per
 /// frame), .raw (the frames as they came back) or a directory of PNGs. Edits without 3D take the direct path to .mp4,
-/// .mov and .txt (RAEA_DIRECT=1 forces it). Its stats go to stderr as one JSON line.
+/// .mov and .txt (RAEA_DIRECT=1 forces it). With RAEA_RENDER_STATS=1, its timings go to stderr as one JSON line.
 pub fn render_file(edit: &str, out: &Path, opts: &RenderOpts) -> Result<(), String> {
     engine::mem_mark("render: start");
     // an HTML composition: its videos on the GPU, the page over them (html.rs)

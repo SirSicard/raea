@@ -4278,7 +4278,7 @@ dependencies = [
  "arrayvec",
  "cc",
  "cfg-if",
- "constant_time_eq",
+ "constant_time_eq 0.4.2",
  "cpufeatures 0.3.1",
 ]
 
@@ -5073,6 +5073,15 @@ name = "constant_time_eq"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
+
+[[package]]
+name = "constant_time_eq"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9eb6feb175df65d0a3ccd3e73484e940d0ac664e8034f0519fd49a93db3071d9"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "constgebra"
@@ -13589,15 +13598,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "019b4b213425016d7d84a153c4c73afb0946fbb4840e4eece7ba8848b9d6da22"
 
 [[package]]
+name = "raea-app-capcut"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "raea-core-scene",
+ "raea-io-alpha",
+ "raea-io-capcut",
+ "raea-io-home",
+ "raea-io-media",
+ "raea-runtime-bundle",
+ "serde_json",
+]
+
+[[package]]
 name = "raea-app-check"
 version = "0.1.0"
 dependencies = [
+ "raea-app-check-flash",
  "raea-core-brief",
  "raea-core-facts",
  "raea-io-trace",
  "raea-sys-measure",
  "serde_json",
 ]
+
+[[package]]
+name = "raea-app-check-flash"
+version = "0.1.0"
 
 [[package]]
 name = "raea-app-ci"
@@ -13625,6 +13653,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "raea-app-engines"
+version = "0.1.0"
+dependencies = [
+ "dunce",
+ "raea-app-interchange",
+ "raea-app-tools",
+ "raea-io-home",
+ "raea-runtime-bundle",
+ "raea-runtime-calls",
+ "raea-runtime-export",
+ "serde_json",
+ "zip",
+]
+
+[[package]]
 name = "raea-app-game"
 version = "0.1.0"
 dependencies = [
@@ -13641,6 +13684,18 @@ dependencies = [
  "serde_json",
  "twox-hash",
  "winit",
+]
+
+[[package]]
+name = "raea-app-interchange"
+version = "0.1.0"
+dependencies = [
+ "raea-core-scene",
+ "raea-core-shape",
+ "raea-runtime-bundle",
+ "raea-runtime-export",
+ "raea-runtime-scene",
+ "serde_json",
 ]
 
 [[package]]
@@ -13975,9 +14030,11 @@ name = "raea-cli"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "raea-app-capcut",
  "raea-app-check",
  "raea-app-ci",
  "raea-app-direction",
+ "raea-app-engines",
  "raea-app-game",
  "raea-app-judge",
  "raea-app-media",
@@ -14161,6 +14218,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "raea-io-alpha"
+version = "0.1.0"
+dependencies = [
+ "block2 0.6.2",
+ "image",
+ "objc2 0.6.5",
+ "objc2-av-foundation",
+ "objc2-core-foundation",
+ "objc2-core-media",
+ "objc2-core-video",
+ "objc2-foundation 0.3.2",
+ "objc2-video-toolbox",
+ "png 0.17.16",
+ "raea-io-apple",
+ "serde_json",
+]
+
+[[package]]
 name = "raea-io-apple"
 version = "0.1.0"
 dependencies = [
@@ -14217,6 +14292,13 @@ dependencies = [
  "raea-io-soft",
  "rav1d",
  "rav1e",
+]
+
+[[package]]
+name = "raea-io-capcut"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
@@ -14508,6 +14590,7 @@ dependencies = [
  "raea-runtime-js",
  "raw-window-handle",
  "serde_json",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -14839,6 +14922,7 @@ dependencies = [
  "raea-core-review",
  "raea-core-scene",
  "raea-gpu-device",
+ "raea-io-alpha",
  "raea-io-assets",
  "raea-io-media",
  "raea-io-net",
@@ -15025,6 +15109,7 @@ dependencies = [
  "raea-runtime-plugins",
  "raea-runtime-scene",
  "raea-runtime-shared",
+ "raea-runtime-shots",
  "raea-runtime-twins",
  "raea-runtime-view",
  "raea-sys-animate",
@@ -15089,6 +15174,17 @@ dependencies = [
  "raea-bevy-world",
  "raea-native",
  "raea-runtime-twins",
+ "serde_json",
+]
+
+[[package]]
+name = "raea-runtime-shots"
+version = "0.1.0"
+dependencies = [
+ "raea-io-assets",
+ "raea-native",
+ "raea-runtime-calls",
+ "raea-sys-bake",
  "serde_json",
 ]
 
@@ -20396,6 +20492,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2"
 
 [[package]]
+name = "typed-path"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ce898823d8cd0f028662d2f349694b1af0a5cc9be83f1d213a00d3147445e1e"
+
+[[package]]
 name = "typedmap"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -23025,6 +23127,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "zip"
+version = "9.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3476fd497ac8af5b1ec7b51acab7bef380f7e8dd8e0487595bafd839417a302"
+dependencies = [
+ "constant_time_eq 0.6.1",
+ "crc32fast",
+ "flate2",
+ "getrandom 0.4.3",
+ "indexmap",
+ "libc",
+ "memchr",
+ "nix",
+ "typed-path",
+ "windows-sys 0.61.2",
+ "zeroize",
 ]
 
 [[package]]

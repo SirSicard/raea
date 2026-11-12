@@ -52,6 +52,6 @@ impl Parts {
             Some(k) => k.iter().map(|n| self.node(n, seen)).collect::<Result<Vec<_>, _>>()?,
             None => Vec::new(),
         };
-        Ok(Node3 { kind: kind.into(), props, shape, kids: kids.into() })
+        Ok(Node3 { kind: kind.into(), props, shape, at: None, kids: kids.into() })
     }
 }

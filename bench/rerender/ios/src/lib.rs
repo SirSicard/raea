@@ -44,8 +44,10 @@ fn started_ms() -> Option<u64> {
 pub unsafe extern "C" fn raea_rerender_run(bundle: *const c_char, out: *const c_char) -> i32 {
     let js = unsafe { CStr::from_ptr(bundle) }.to_string_lossy().into_owned();
     let out = unsafe { CStr::from_ptr(out) }.to_string_lossy().into_owned();
+    // SAFETY (both): set before any thread of raea's starts (main.m calls this first); the render's stats line is what
+    // bench.sh reads from the console
+    unsafe { std::env::set_var("RAEA_RENDER_STATS", "1") };
     if let Some(t0) = started_ms() {
-        // SAFETY: set before any thread of raea's starts (main.m calls this first)
         unsafe { std::env::set_var("RAEA_STARTUP_TRACE", t0.to_string()) };
     }
     raea_runtime_react::startup_mark("main");

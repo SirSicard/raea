@@ -5,7 +5,7 @@
 //!   app.open {url}                an http(s) or mailto link, in the person's browser
 //!   notify {title, body}          a macOS notification (asked for once, the first time: notify.permission)
 //!   notify.permission -> bool     macOS's prompt, or its answer if already given
-//!   dock.badge {text}             the dock icon's badge ("" clears it)
+//!   dock.badge {text}             the Dock icon's badge, on Windows the taskbar button's overlay ("" clears it)
 //!   app.urls -> string[]          raea:// links opened since the last ask, the app brought to the front for each
 //!   native.log -> {...}           what was done, for tests
 //!
@@ -117,10 +117,8 @@ fn run(live: bool, name: &str, a: &Value, answer: Answer) {
         }
         "notify" => {
             let (title, body) = (text(a, "title"), text(a, "body"));
-            if live {
-                if let Err(e) = mac::notify(&title, &body) {
-                    return answer.err(e);
-                }
+            if live && let Err(e) = mac::notify(&title, &body) {
+                return answer.err(e);
             }
             log(|l| l.notified.push(json!({"title": title, "body": body})));
             answer.ok(json!(true))
@@ -136,6 +134,9 @@ fn run(live: bool, name: &str, a: &Value, answer: Answer) {
             let t = text(a, "text");
             if live {
                 mac::badge(&t);
+                // the taskbar button's overlay (win.rs)
+                #[cfg(all(windows, feature = "window"))]
+                crate::win::badge(&t);
             }
             log(|l| l.badge = t);
             answer.ok(json!(true))

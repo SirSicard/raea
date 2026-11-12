@@ -22,6 +22,8 @@ interface BufferSpec {
   normals?: number[];
   uvs?: number[];
   colors?: number[] | string[];
+  /** its own attributes for a <ThreeShaderMaterial> (each one's size, 1-4, and values a vertex) */
+  attributes?: Record<string, { size: number; values: number[] }>;
 }
 
 /** a <BufferMesh>'s arrays as a geometry */
@@ -37,6 +39,7 @@ export function bufferGeometry(b: BufferSpec): THREE.BufferGeometry {
     const rgba = typeof c[0] === "string" ? (c as string[]).flatMap((h) => { const k = new THREE.Color(h); return [k.r, k.g, k.b, 1]; }) : (c as number[]);
     g.setAttribute("color", new THREE.Float32BufferAttribute(rgba, 4));
   }
+  for (const [k, a] of Object.entries(b.attributes ?? {})) g.setAttribute(k, new THREE.Float32BufferAttribute(a.values, a.size));
   return g;
 }
 

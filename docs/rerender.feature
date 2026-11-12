@@ -110,10 +110,44 @@ Feature: Re-render, don't stitch: one render changes anything per frame, redraws
       And a grade ramp over 60 frames equals 60 stills each rendered alone with that frame's grade
       And a play of the film (raea play) shows the same look changes as its render (render = play)
 
+    @done
     Scenario: RR2. The camera changes per frame
+      # Status 11-10: done. `<Camera3d is_active>` (Bevy's Camera field) says which camera draws: each frame's first
+      # active camera in the tree is the piece's, the others are dropped from that frame (their depth of field and
+      # ambient with them), and the camera row's `shot` column steps where another camera takes over (active.rs). A
+      # frame where it steps is a cut (Shots), drawn as a shot rendered alone draws its first frame: motion blur's
+      # step before it draws the frame itself, not the other camera's frame, and Solari's and the path tracer's
+      # history start again (`reset`). Play sends the shot on its live camera row, 0 again when the first camera is
+      # back, and its engine takes a changed shot as a cut (Moved). A teleport of one camera is no cut: it smears.
+      # Found on the way, and fixed for cuts only: the step to f - 1 that motion blur needs never runs on any engine,
+      # because the Engine's reads (react_share) count as a Bevy plugin. Renders are right anyway (export draws f - 1
+      # before every f for those reads); play blurs from the frame drawn last. Handed to the issues lane.
+      # RR0's film has no shot with two cameras, so bench/rerender/cams.tsx is the piece: camera A wide and dollying
+      # (frames 0-39), B low and close at f/1.4 (40-89), A again (90-119), parts moving, motion blur on. Each shot is
+      # also its own composition, as an agent's chunk is. Measured on this Mac with bench/rerender/rr2.sh:
+      #   without motion blur, the piece against its three shot compositions: 120/120 frames identical (each cut
+      #   frame is SSIM 0.707 and 0.688 from the frame before it: the cut is there)
+      #   with motion blur, against the same compositions: the frames before the first cut and both cut frames
+      #   identical; the other 78 differ by the blur's grain alone, SSIM >= 0.999439, because the grain is seeded by
+      #   the frame number and a composition counts from 0 (raea-sys-post pin_frame_count). The control, one camera
+      #   moved to B's place and back: its cut frames 0.810 and 0.785 against the shots' first frames
+      #   with motion blur, each shot of the piece rendered alone (--at its frames): 120/120 identical, as RR3's
+      #   re-rendered segments need
+      #   raea play seeking onto a cut, across each cut frame by frame and back: 7/7 held seeks identical to the
+      #   render. The seeks that jump (40 to 38, 41 to 88, 91 back to 90) are said, not held: with motion blur a jump
+      #   differs from the render in play, cut or not, since before RR2
+      # Cost: the piece in 2.3-2.9 s, its three shots as compositions in 4.9-6.0 s together.
+      # Not covered: the three.js hosts (sdk/r3f, playables) still take the first camera node; a live game's cuts
+      # take the same path as play's but weren't run.
       Given the plan
-        | crate             | file                          | lines | job                                                                              |
-        | raea-runtime-look | runtime/look/src/active.rs    | 120   | which camera draws the output, per frame: `<Camera3d active>` keyed, or a cut list |
+        | crate              | file                           | lines | job                                                                              |
+        | raea-runtime-look  | runtime/look/src/active.rs     | 82    | which camera draws, per frame: the first active one (`<Camera3d is_active>`), the others dropped; its shot keyed where it steps |
+        | raea-sys-frame     | systems/frame/src/shots.rs     | 41    | the frames a shot starts at (Shots), and a live camera row's shot changed (Moved) |
+        | raea-render        | engine/render/src/engine.rs    | 490   | a cut drawn as a shot's first frame: the step before it draws the frame itself, with a plugin too; Solari reset (raytrace cut) |
+        | raea-runtime-scene | runtime/scene/src/live.rs      | 432   | play's camera row says its shot, and 0 when the first camera is back |
+        | -                  | sdk/render/src/bevy3d/core.tsx | 332   | `is_active` on `<Camera3d>`; an inactive camera isn't the one the pointer picks through |
+        | -                  | bench/rerender/cams.tsx        | 82    | two cameras cut A, B, A with parts moving, each shot its own composition too, and a one-camera control |
+        | -                  | bench/rerender/rr2.sh          | 141   | the four checks above (still, blur, range, play), each writing its JSON, frames deleted as they're compared |
       Then a film can cut between several cameras inside one render
       And RR0's two-camera shot rendered once equals the same shot rendered as one render per camera, frame for frame
 

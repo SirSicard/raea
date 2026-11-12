@@ -16,11 +16,82 @@ pub struct Instanced;
 /// A row's `inst`: 10 numbers a copy (position, rotation xyzw, scale).
 pub fn placements(t: &Tup) -> Result<Option<Vec<Transform>>, String> {
     let Some(V::S(s)) = t.vals.get("inst") else { return Ok(None) };
-    let n: Vec<f32> = s.split_ascii_whitespace().map(|x| x.parse::<f32>().map_err(|e| format!("{}: inst: {e}", t.id))).collect::<Result<_, _>>()?;
-    if n.len() % 10 != 0 {
-        return Err(format!("{}: inst is 10 numbers a copy, got {}", t.id, n.len()));
+    parsed(&t.id, s).map(Some)
+}
+
+fn parsed(id: &str, s: &str) -> Result<Vec<Transform>, String> {
+    let mut n: Vec<f32> = vec![];
+    for x in s.split_ascii_whitespace() {
+        n.push(x.parse().map_err(|e| format!("{id}: inst: {x}: {e}"))?);
     }
-    Ok(Some(n.chunks(10).map(|c| Transform { translation: Vec3::new(c[0], c[1], c[2]), rotation: Quat::from_xyzw(c[3], c[4], c[5], c[6]).normalize(), scale: Vec3::new(c[7], c[8], c[9]) }).collect()))
+    if n.len() % 10 != 0 {
+        return Err(format!("{id}: inst is 10 numbers a copy, got {}", n.len()));
+    }
+    Ok(n.chunks(10).map(|c| Transform { translation: Vec3::new(c[0], c[1], c[2]), rotation: Quat::from_xyzw(c[3], c[4], c[5], c[6]).normalize(), scale: Vec3::new(c[7], c[8], c[9]) }).collect())
+}
+
+/// An <Instances> whose placements may change (#85): the lists a render's row shows (`inst_all`; which one a frame
+/// shows is keyed as `inst_k`) and the one shown, or a live row's `inst` as last applied; and where each of a placement's
+/// copies sits in it (a model's meshes, in the model; a mesh's one copy, at the placement). Copies are its children,
+/// placement by placement.
+#[derive(Component)]
+pub struct Placements {
+    lists: Vec<String>,
+    shown: usize,
+    live: String,
+    parts: Vec<Mat4>,
+}
+
+impl Placements {
+    pub(crate) fn of(t: &Tup) -> Placements {
+        let all = match t.vals.get("inst_all") { Some(V::S(s)) => s.split('|').map(str::to_string).collect(), _ => vec![] };
+        let live = match t.vals.get("inst") { Some(V::S(s)) => s.clone(), _ => String::new() };
+        Placements { lists: all, shown: 0, live, parts: vec![] }
+    }
+}
+
+/// Each <Instances>' copies moved to the frame's placements when they're another list than the one shown: a render's
+/// `inst_k`, or a live row's `inst`. A frame whose list has another count than the copies is an error.
+pub fn sync_instances(frame: Res<FrameRows>, mut q: Query<(Entity, &mut Placements, &Children)>, mut ts: Query<&mut Transform>, mut error: ResMut<Error>) {
+    for (e, mut pl, kids) in &mut q {
+        if pl.parts.is_empty() {
+            continue;
+        }
+        let Some(v) = frame.vals(e) else { continue };
+        // a live row's own list first (a render's `inst` is its first frame's on every frame, so it never differs)
+        let s = match (v.get("inst"), v.get("inst_k")) {
+            (Some(V::S(s)), _) if *s != pl.live => {
+                pl.live = s.clone();
+                s.clone()
+            }
+            (_, Some(k)) if !pl.lists.is_empty() => {
+                let k = (k.num().round().max(0.0) as usize).min(pl.lists.len() - 1);
+                if k == pl.shown {
+                    continue;
+                }
+                pl.shown = k;
+                pl.lists[k].clone()
+            }
+            _ => continue,
+        };
+        let at = match parsed(&format!("{e}"), &s) {
+            Ok(at) if at.len() * pl.parts.len() == kids.len() => at,
+            Ok(at) => {
+                error.0.get_or_insert(format!("Instances: a frame has {} placements where it began with {}; the count can't change", at.len(), kids.len() / pl.parts.len()));
+                continue;
+            }
+            Err(err) => {
+                error.0.get_or_insert(err);
+                continue;
+            }
+        };
+        let places = at.iter().flat_map(|tr| pl.parts.iter().map(move |local| Transform::from_matrix(tr.to_matrix() * *local)));
+        for (kid, want) in kids.iter().zip(places) {
+            if let Ok(mut t) = ts.get_mut(kid) {
+                *t = want;
+            }
+        }
+    }
 }
 
 /// The markers a copy takes from its parent: shadows cast and received, render layers.
@@ -52,7 +123,7 @@ pub fn instance_mesh(world: &mut World, e: Entity, t: &Tup) -> Result<(), String
     };
     let Some(mesh) = world.entity_mut(e).take::<Mesh3d>() else { return Err(format!("mesh {}: no mesh to instance", t.id)) };
     let m = markers(world, e);
-    world.entity_mut(e).insert(Instanced);
+    world.entity_mut(e).insert((Instanced, Placements { parts: vec![Mat4::IDENTITY], ..Placements::of(t) }));
     for tr in at {
         spawn_copy(world, e, mesh.clone(), mat.clone(), tr, &m);
     }
@@ -113,6 +184,9 @@ pub fn instance_models(world: &mut World) {
         }
         for r in roots {
             world.entity_mut(r).despawn();
+        }
+        if let Some(mut pl) = world.get_mut::<Placements>(e) {
+            pl.parts = parts.iter().map(|p| p.2).collect();
         }
         world.entity_mut(e).insert(Instanced);
     }

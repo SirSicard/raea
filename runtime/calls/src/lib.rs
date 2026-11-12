@@ -15,6 +15,7 @@
 //!   ecs.despawn {world, id}; ecs.query {world, kind, where: [[col, op, value]]} -> {ids}; ecs.column {world, kind, col};
 //!   ecs.rows {world}; ecs.count {world, kind}; ecs.clone {world} -> {world}; ecs.free {world}
 //!   print {text}                                              (a headless run's output, to stdout)
+//!   blender.post {sid, ops} -> {r, n, err?}                   (raea/blender's batches, to the Blender `raea blender run` started)
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -29,6 +30,8 @@ type R<T> = Result<T, String>;
 pub mod ml;
 // ECS worlds on Bevy's own ECS (/ecs)
 pub mod ecs;
+/// raea/blender's batches, to the Blender `raea blender run SCRIPT.ts` started (sdk/blender)
+pub mod blender;
 mod media;
 mod solid;
 
@@ -166,6 +169,7 @@ pub fn call(name: &str, v: &Value) -> R<Value> {
                 }
                 Ok(Value::Null)
             }
+            "blender.post" => blender::post(v),
             n if n.starts_with("ecs.") => ecs::call(n, v),
             // placement by relations (raea-core-place)
             "place.solve" => raea_core_place::solve_json(v),
@@ -193,6 +197,7 @@ pub fn register() {
         let calls: &[(&str, &str, &str, &str)] = &[
             ("done", "{ code: number }", "null", "a headless run ends with this exit code"),
             ("print", "{ text: string }", "null", "one line of a headless run's output"),
+            ("blender.post", "{ sid: string; ops: unknown[] }", "{ r: Record<string, unknown>; n: number; err?: { i: number; type: string; msg: string; trace: string } }", "a batch of raea/blender's operations run by the Blender `raea blender run SCRIPT.ts` started (sdk/blender)"),
             ("solid.make", "{ fn: \"box\" | \"rounded_box\" | \"sphere\" | \"cylinder\" | \"cone\" | \"torus\" | \"text3d\"; args: (number | string)[] }", SOLID, "a Manifold solid from a primitive"),
             ("solid.expr", "{ expr: string }", SOLID, "a Manifold solid from an expression (raea-render's mesh shape language)"),
             ("solid.combine", "{ fn: \"union\" | \"minus\" | \"intersect\" | \"hull\"; ids: number[] }", SOLID, "a boolean or hull of solids"),

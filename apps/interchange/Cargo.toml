@@ -1,0 +1,17 @@
+[package]
+name = "raea-app-interchange"
+version = "0.1.0"
+edition = "2024"
+license = "FSL-1.1-ALv2"
+publish = false
+description = "A composition's 3D as data another tool builds (`raea scene export`: scene.json, its meshes and models), a Godot project written from it, and what changed in Blender or Godot read back as edits to the TSX (docs/blender.feature BL37-BL39, docs/godot.feature GD12-GD13)"
+
+[dependencies]
+# the composition bundled and stepped to its frames' 3D (raea-runtime-export's scene_frames), walked into parts
+raea-runtime-bundle = { path = "../../runtime/bundle" }
+raea-runtime-export = { path = "../../runtime/export" }
+raea-runtime-scene = { path = "../../runtime/scene" }
+raea-core-scene = { path = "../../core/scene" }
+# a mesh that isn't a primitive written as a .glb (Manifold's)
+raea-core-shape = { path = "../../core/shape" }
+serde_json = "1"

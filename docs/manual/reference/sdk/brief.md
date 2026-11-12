@@ -48,6 +48,8 @@ function brief(b: Brief): Brief
 ### `controller`
 
 A workspace's controller (controllers/<id>.ts): settings in groups of typed fields that every agent works to.
+A standing decision ("every ad is 9:16"), not one piece of work: that's a feed item, and a note on it. The raea app
+shows a new controller in the project's feed, and an agent brings one to the person with `controller_post`.
 
 ```ts
 function controller(c: ControllerInput): ControllerInput

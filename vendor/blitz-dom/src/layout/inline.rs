@@ -470,13 +470,14 @@ impl LayoutPassState<'_> {
                 && is_block_axis_scroll_container)
                 && !contain_layout;
             let mut box_inputs = inline_box_inputs(style.size().width, margin, child_inputs);
-            // raea: a flex or grid box is laid out in full even when the line is only being measured: Taffy's
-            // flexbox and grid return their size without a baseline when asked for size alone, and the box then sat
-            // on the line's baseline by its bottom margin edge, so a block holding an inline-flex measured taller than
-            // Chrome's (the strut's descent under it) wherever its parent measures it first (a column flex)
-            if !is_flow {
-                box_inputs.run_mode = taffy::RunMode::PerformLayout;
-            }
+            // raea: an inline box is laid out in full even when the line is only being measured. Asked for size alone,
+            // Taffy's flexbox and grid return no baseline, and its cache keeps a measured box's size without its
+            // baseline (Cache::get, from_outer_size): a box then sits on the line's baseline by its bottom margin
+            // edge, and the line measures taller than Chrome's by the strut's descent wherever its parent measures
+            // it first (a column flex). An inline-flex did that on its first layout; an inline-block did it on a
+            // relayout, once a sibling's style changed and the line's unchanged boxes came back from the cache: a
+            // title of per-character spans jumped 24 px on the frames one span's transform left zero (#109)
+            box_inputs.run_mode = taffy::RunMode::PerformLayout;
             drop(style);
 
             if is_out_of_flow || is_floated {

@@ -1,0 +1,14 @@
+{
+  "name": "@raea/godot",
+  "license": "FSL-1.1-ALv2",
+  "private": true,
+  "version": "0.1.1",
+  "description": "Godot's whole API from TypeScript through GodotJS (MIT): Godot 4.6.1's classes, singletons, enums and builtins, typed from GodotJS's codegen (tools/gen.sh), run by `raea godot run` in the Godot raea setup godot installs, on Godot's own JavaScript engine (JavaScriptCore on the Mac, QuickJS on Windows and Linux).",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./shot": "./src/shot.tsx"
+  },
+  "files": ["src", "tools", "README.md"]
+}

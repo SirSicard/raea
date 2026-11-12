@@ -137,7 +137,7 @@ fn place_camera(out: &mut Vec<Item>, eye: [f64; 3], at: [f64; 3], fov: Option<f6
         None => {
             let mut props = Map::new();
             set(&mut props);
-            out.push(Item { kind: "camera", props: Arc::new(props), shape: None, material: None, world: Mat4::IDENTITY });
+            out.push(Item { kind: "camera", props: Arc::new(props), shape: None, material: None, at: None, world: Mat4::IDENTITY });
         }
     }
 }
@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn a_review_camera_drops_the_scene_cameras_rotation_and_one_is_added_when_there_is_none() {
         let props = json!({"position": [0, 2, 6], "lookAt": [0, 1, 0], "rotation": [0.0, 0.0, 0.0, 1.0]}).as_object().cloned().unwrap();
-        let mut its = vec![Item { kind: "camera", props: Arc::new(props), shape: None, material: None, world: Mat4::IDENTITY }];
+        let mut its = vec![Item { kind: "camera", props: Arc::new(props), shape: None, material: None, at: None, world: Mat4::IDENTITY }];
         place_camera(&mut its, [6.0, 1.7, 0.0], [0.5, 1.5, 0.0], Some(40.0));
         let p = &its[0].props;
         assert_eq!((p["position"].clone(), p["lookAt"].clone(), p["fov"].clone(), p.get("rotation")), (json!([6.0, 1.7, 0.0]), json!([0.5, 1.5, 0.0]), json!(40.0), None));

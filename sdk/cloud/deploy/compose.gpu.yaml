@@ -1,0 +1,20 @@
+# An NVIDIA GPU for raea's renders (docs/cloud.feature CL9), on top of compose.yaml:
+#
+#   docker compose -f compose.yaml -f compose.gpu.yaml up -d
+#
+# The host needs NVIDIA's driver and the NVIDIA Container Toolkit. raea renders through Vulkan, so the container asks
+# for the graphics capability too ("all" below): the toolkit then mounts NVIDIA's Vulkan driver and its ICD file, and
+# raea's Vulkan picks the GPU over Mesa's llvmpipe. `docker compose exec raea nvidia-smi` shows the GPU the container
+# sees, and raea's process on it while a render runs.
+services:
+  raea:
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

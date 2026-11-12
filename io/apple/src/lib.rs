@@ -34,7 +34,8 @@ use raea_io_codec::{Audio, Backend, EncodeOpts, EncodeStats, Frame, Info, R, Vid
 
 pub struct Apple;
 
-fn cf_key(k: &CFString) -> &NSString {
+/// A CoreFoundation string constant as the NSString key AVFoundation takes (toll-free bridged).
+pub fn cf_key(k: &CFString) -> &NSString {
     // CFString and NSString are toll-free bridged
     unsafe { &*(k as *const CFString as *const NSString) }
 }

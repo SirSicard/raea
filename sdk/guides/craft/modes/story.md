@@ -12,8 +12,9 @@ they want the whole film.
 - **A world first.** The brief's `## Look` commits to one world: what each colour means, the light, the camera
   language, the type. Every shot belongs to it. Shots that look borrowed from different films break the spell.
 - **A storyboard and a camera map before shooting.** For each shot: the subject, the framing, how the camera moves
-  and how the cut joins the next shot (motion matched, a planned reversal, a hard cut on a hit). The person approves
-  the board before anything renders.
+  and how the cut joins the next shot (motion matched, a planned reversal, a hard cut on a hit). Plan the cuts as a
+  chain of hooks on the thirds, each shot taking the eye in where the last one left it (`raea guide match-cuts`). The
+  person approves the board before anything renders.
 - **Shots on a subject.** Close or medium on a person, an object, an action. A wide shot earns its place by showing
   where we are, once, and still has something in it.
 - **Cameras moving through cuts.** A shot starts already moving and ends still moving, so the cut joins motion to

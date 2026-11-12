@@ -1,0 +1,10 @@
+[package]
+name = "raea-io-capcut"
+version = "0.1.0"
+edition = "2024"
+license = "FSL-1.1-ALv2"
+publish = false
+description = "A CapCut desktop draft written from a timeline of clips (docs/capcut.feature CC2): tracks, segments and materials as CapCut's own, the project folder, the store's version markers and its project list"
+
+[dependencies]
+serde_json = "1"

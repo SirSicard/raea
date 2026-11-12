@@ -5,7 +5,7 @@ import { events3d, local, onFlat, pickIn, under, worldBounds, IDENTITY, type Las
 import { pick } from "../../render/src/pick";
 import { Mesh3d, Quat, StandardMaterial } from "../../render/src/bevy3d";
 import { pickable3d } from "../../render/src/events3d";
-import { Sphere } from "../src/3d";
+import { Cone, Sphere } from "../src/3d";
 import { renderFrame } from "../src/test";
 
 type P = { x: number; y: number; down: boolean };
@@ -154,5 +154,16 @@ describe("a part is picked by its geometry's bounds (FC1b: worked out only for a
     const parts = pickable3d();
     expect(parts.get("ball")).toEqual({ name: "ball", sphere: { center: [1, 2, 3], radius: 2 } });
     expect(parts.has("still")).toBe(false);
+  });
+
+  test("a Cone's bounds span its height, centred on its origin as it's drawn (#98)", () => {
+    renderFrame(
+      <Mesh3d name="cone" onClick={() => {}}>
+        <Cone radius={0.5} height={2} />
+        <StandardMaterial />
+      </Mesh3d>,
+      { frame: 0, width: 320, height: 240, fps: 30, durationInFrames: 30 },
+    );
+    expect(pickable3d().get("cone")).toEqual({ name: "cone", box: { min: [-0.5, -1, -0.5], max: [0.5, 1, 0.5] } });
   });
 });

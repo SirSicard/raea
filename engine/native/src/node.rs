@@ -174,16 +174,15 @@ fn js_string(s: &str) -> String {
 }
 
 /// A file's ES module source: TypeScript transpiled, JSON as its default export, an ES module as it is, a CommonJS
-/// file through node.js's require (its module.exports the default export)
-pub fn load(path: &Path) -> Result<String, String> {
-    // import.meta.main (Bun's and Node 24's): false in an imported module (js::run_node makes it true in the entry);
-    // JavaScriptCore's embedding API has no hook for import.meta, so it's written into the text
-    load_module(path).map(|s| s.replace("import.meta.main", "false"))
-}
-
-/// The entry's source: import.meta.main true
-pub fn load_entry(path: &Path) -> Result<String, String> {
-    load_module(path).map(|s| s.replace("import.meta.main", "true"))
+/// file through node.js's require (its module.exports the default export). JavaScriptCore's embedding API has no hook
+/// for import.meta, so two of its fields are written into the text: import.meta.main (Bun's and Node 24's), true in
+/// the entry (`entry`, js::run_node's) and false in what it imports, and import.meta.url, the file's own URL, which
+/// macOS 15's JavaScriptCore left undefined (a newer one gives the module's key): createRequire(import.meta.url) then
+/// looked for packages from "."
+pub fn load(path: &Path, entry: bool) -> Result<String, String> {
+    let abs = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+    let url = js_string(&format!("file://{}", abs.display()));
+    load_module(path).map(|s| s.replace("import.meta.main", if entry { "true" } else { "false" }).replace("import.meta.url", &url))
 }
 
 fn load_module(path: &Path) -> Result<String, String> {

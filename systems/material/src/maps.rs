@@ -200,15 +200,21 @@ pub fn material(world: &mut World, t: &Tup, inserted: &[Tup], dir: &Path) -> Res
         _ => BTreeMap::new(),
     };
     let sam = |prop: &str| own.get(prop).or(all.as_ref());
-    // a UiTexture's image (raea-screen:name@WxH): the screen image its UI is drawn into
+    // a UiTexture's image (raea-screen:name@WxH) in any map: the screen image its UI is drawn into, as it is drawn
+    // (a panel that glows: its UI as the emissive map, so it shows under Solari, which draws no unlit surface)
     let named = world.get_resource::<NamedImages>().map(|n| n.0);
-    if let Some(h) = src("map").zip(named).and_then(|(s, named)| named(world, &s)) {
-        m.base_color_texture = Some(h);
-    } else if let Some(s) = src("map") {
-        m.base_color_texture = Some(cached_map(world, s.clone(), MapKind::Colour, repeat, sam("map"), || map_picture(t, inserted, dir, "map", &s))?);
+    let screen = |world: &mut World, s: &str| named.and_then(|named| named(world, s));
+    if let Some(s) = src("map") {
+        m.base_color_texture = Some(match screen(world, &s) {
+            Some(h) => h,
+            None => cached_map(world, s.clone(), MapKind::Colour, repeat, sam("map"), || map_picture(t, inserted, dir, "map", &s))?,
+        });
     }
     if let Some(s) = src("normal_map") {
-        m.normal_map_texture = Some(cached_map(world, s.clone(), MapKind::Data, repeat, sam("normalMap"), || map_picture(t, inserted, dir, "normalMap", &s))?);
+        m.normal_map_texture = Some(match screen(world, &s) {
+            Some(h) => h,
+            None => cached_map(world, s.clone(), MapKind::Data, repeat, sam("normalMap"), || map_picture(t, inserted, dir, "normalMap", &s))?,
+        });
     }
     // the clearcoat layer's own normals, data not colour (rotate_environment_map loads it with is_srgb false); Bevy
     // binds them only with its multi-layer textures (this crate's `multi-layer` feature)
@@ -221,7 +227,10 @@ pub fn material(world: &mut World, t: &Tup, inserted: &[Tup], dir: &Path) -> Res
         return Err(format!("{}: clearcoat_normal_texture {s}: this raea is built without Bevy's clearcoat textures (raea-sys-material's multi-layer feature, off by default: docs/control.feature FC0a)", t.id));
     }
     if let Some(s) = src("mr_map") {
-        m.metallic_roughness_texture = Some(cached_map(world, s.clone(), MapKind::Data, repeat, sam("metallicRoughnessMap"), || map_picture(t, inserted, dir, "metallicRoughnessMap", &s))?);
+        m.metallic_roughness_texture = Some(match screen(world, &s) {
+            Some(h) => h,
+            None => cached_map(world, s.clone(), MapKind::Data, repeat, sam("metallicRoughnessMap"), || map_picture(t, inserted, dir, "metallicRoughnessMap", &s))?,
+        });
     } else if src("rough_map").is_some() || src("metal_map").is_some() {
         // separate greyscale maps packed into glTF's layout: green roughness, blue metalness (white where there's no
         // map, so the factor alone sets it)
@@ -239,10 +248,16 @@ pub fn material(world: &mut World, t: &Tup, inserted: &[Tup], dir: &Path) -> Res
         })?);
     }
     if let Some(s) = src("ao_map") {
-        m.occlusion_texture = Some(cached_map(world, s.clone(), MapKind::Data, repeat, sam("aoMap"), || map_picture(t, inserted, dir, "aoMap", &s))?);
+        m.occlusion_texture = Some(match screen(world, &s) {
+            Some(h) => h,
+            None => cached_map(world, s.clone(), MapKind::Data, repeat, sam("aoMap"), || map_picture(t, inserted, dir, "aoMap", &s))?,
+        });
     }
     if let Some(s) = src("emissive_map") {
-        m.emissive_texture = Some(cached_map(world, s.clone(), MapKind::Colour, repeat, sam("emissiveMap"), || map_picture(t, inserted, dir, "emissiveMap", &s))?);
+        m.emissive_texture = Some(match screen(world, &s) {
+            Some(h) => h,
+            None => cached_map(world, s.clone(), MapKind::Colour, repeat, sam("emissiveMap"), || map_picture(t, inserted, dir, "emissiveMap", &s))?,
+        });
     }
     // how its alpha and faces draw (alphaMode, alphaCutoff, side) and real transmission (transmission, ior, thickness)
     if let Some(V::S(a)) = vals.get("alpha") {
@@ -412,4 +427,42 @@ pub fn mip_chain(data: Vec<u8>, w: u32, h: u32) -> (Vec<u8>, u32) {
         levels += 1;
     }
     (out, levels)
+}
+
+#[cfg(test)]
+mod screen_map_tests {
+    use super::*;
+
+    #[derive(Resource)]
+    struct Panel(Handle<Image>);
+
+    fn named(world: &mut World, src: &str) -> Option<Handle<Image>> {
+        (src == "raea-screen:panel@8x4").then(|| world.resource::<Panel>().0.clone())
+    }
+
+    /// A UiTexture's image (raea-screen:name@WxH) is the texture of whichever map names it, the same handle its UI is
+    /// drawn into: as the emissive map a panel glows, and shows under Solari, which draws no unlit surface. Before, only
+    /// the base colour looked it up and an emissive one was refused as a missing file.
+    #[test]
+    fn a_screen_image_is_the_texture_of_any_map() {
+        let mut world = World::new();
+        world.init_resource::<Assets<Image>>();
+        let h = world.resource_mut::<Assets<Image>>().add(Image::default());
+        world.insert_resource(Panel(h.clone()));
+        world.insert_resource(NamedImages(named));
+        let mut vals = BTreeMap::new();
+        for k in ["map", "emissive_map", "normal_map", "ao_map", "mr_map"] {
+            vals.insert(k.to_string(), V::S("raea-screen:panel@8x4".into()));
+        }
+        let t = Tup { kind: "mesh".into(), id: "panel".into(), vals };
+        let m = material(&mut world, &t, &[], Path::new(".")).unwrap();
+        for (slot, tex) in [("map", &m.base_color_texture), ("emissive", &m.emissive_texture), ("normal", &m.normal_map_texture), ("ao", &m.occlusion_texture), ("mr", &m.metallic_roughness_texture)] {
+            assert_eq!(tex.as_ref(), Some(&h), "{slot}");
+        }
+        // a screen nobody draws is still a file name, and a missing file is refused
+        let mut vals = BTreeMap::new();
+        vals.insert("emissive_map".to_string(), V::S("raea-screen:other@8x4".into()));
+        let t = Tup { kind: "mesh".into(), id: "panel".into(), vals };
+        assert!(material(&mut world, &t, &[], Path::new(".")).is_err());
+    }
 }

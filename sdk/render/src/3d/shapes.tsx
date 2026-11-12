@@ -97,7 +97,7 @@ function boundsOf(name: string, a: number[]): LocalBounds | undefined {
     case "Plane": return box(a[0] / 2, a[1] / 2, 0);
     case "Cylinder": return box(Math.max(a[0], a[1]), a[2] / 2, Math.max(a[0], a[1]));
     case "Torus": return box(a[0] + a[1], a[0] + a[1], a[1]);
-    case "Cone": return box(a[0], a[1], a[0]);
+    case "Cone": return box(a[0], a[1] / 2, a[0]);
     case "Capsule": return box(a[0], a[1] / 2 + a[0], a[0]);
   }
   return undefined;

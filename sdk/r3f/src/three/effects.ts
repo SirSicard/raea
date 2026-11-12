@@ -220,7 +220,9 @@ void main() {
 
 /** a grade field across shadows, midtones and highlights */
 function levels(p: Record<string, unknown>, k: string, d: number): THREE.Vector3 {
-  const at = (s: string) => num((p[s] as Record<string, unknown> | undefined)?.[k], d);
+  // Grade's top-level value (its `saturation`, Bevy's global one) is each section's unless the section sets its own
+  const all = num(p[k], d);
+  const at = (s: string) => num((p[s] as Record<string, unknown> | undefined)?.[k], all);
   return new THREE.Vector3(at("shadows"), at("midtones"), at("highlights"));
 }
 
@@ -369,7 +371,8 @@ export class Effects {
         const mode = String(p.mode ?? "site");
         u.size.value.set(w, h);
         u.cell.value = num(p.pixelSize, 6);
-        u.mode.value = { pixel: 0, site: 1, ink: 2, paint: 3, cartoon: 3 }[mode] ?? 1;
+        // paint and cartoon are in the surfaces (paint.ts): the pass only draws the frame in cells, as pixel does
+        u.mode.value = { pixel: 0, site: 1, ink: 2, paint: 0, cartoon: 0 }[mode] ?? 1;
         u.keep.value = num(p.color, 1);
         u.lift.value = num(p.lift, 0);
         u.gain.value = num(p.gain, 1);
@@ -380,7 +383,7 @@ export class Effects {
         u.ink.value.set(String(p.ink ?? "#1a1410"));
         u.paper.value.set(String(p.paper ?? "#efe6d2"));
         u.light.value = p.theme === "light" ? 1 : 0;
-        if (mode === "paint" || mode === "cartoon") u.cell.value = 1;
+        if (mode === "paint" || mode === "cartoon") u.cell.value = num(p.pixelSize, 1);
         break;
       }
       case "Fisheye":

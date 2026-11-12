@@ -5,7 +5,7 @@
 //! clock instead.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering::Relaxed};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -20,6 +20,8 @@ struct Shared {
     /// the device's delay from a callback to its sound reaching the speaker, in seconds (f64 bits)
     delay: AtomicU64,
     muted: AtomicBool,
+    /// the element's volume, 0..1 (f32 bits): the gain while it isn't muted
+    volume: AtomicU32,
     running: AtomicBool,
 }
 
@@ -50,7 +52,7 @@ impl Sound {
         let ch = (def.channels() as usize).max(1);
         let rate = audio.rate as f64;
         let step = rate / def.sample_rate().0 as f64;
-        let shared = Arc::new(Shared { pos: AtomicU64::new(0f64.to_bits()), jump: AtomicU64::new(NONE), delay: AtomicU64::new(0f64.to_bits()), muted: AtomicBool::new(muted), running: AtomicBool::new(false) });
+        let shared = Arc::new(Shared { pos: AtomicU64::new(0f64.to_bits()), jump: AtomicU64::new(NONE), delay: AtomicU64::new(0f64.to_bits()), muted: AtomicBool::new(muted), volume: AtomicU32::new(1f32.to_bits()), running: AtomicBool::new(false) });
         let s = shared.clone();
         let src = audio.channels;
         let last = len - 1;
@@ -75,7 +77,7 @@ impl Sound {
                 s.pos.store(p.to_bits(), Relaxed);
                 return;
             }
-            let gain = if s.muted.load(Relaxed) { 0.0 } else { 1.0 };
+            let gain = if s.muted.load(Relaxed) { 0.0 } else { f32::from_bits(s.volume.load(Relaxed)) };
             for frame in out.chunks_mut(ch) {
                 if p as usize > last {
                     frame.fill(0.0);
@@ -112,6 +114,12 @@ impl Sound {
 
     pub fn set_muted(&self, muted: bool) {
         self.shared.muted.store(muted, Relaxed);
+    }
+
+    /// How loud it plays while it isn't muted, 0..1 (a page's element.volume).
+    pub fn set_volume(&self, volume: f32) {
+        let v = if volume.is_finite() { volume.clamp(0.0, 1.0) } else { 1.0 };
+        self.shared.volume.store(v.to_bits(), Relaxed);
     }
 
     /// The source time now reaching the speaker: what the picture shows to be in step with it.

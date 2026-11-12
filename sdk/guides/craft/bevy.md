@@ -23,6 +23,7 @@ pieces; then write the file. Each file's example is a complete composition you c
 | interiors: rooms, cabinets along walls, windows and bays, chairs turned to tables, layout checks, wall decor, the garden outside, daylight, sounds placed in the scene | `bevy/rooms` |
 | a whole scene to build and make believable: the brief, which tool makes which object, build order, review sheets, the judge, when to stop | `bevy/scenes` |
 | the words to paste for a whole scene: the brief template, the builder prompt, the judge prompt | `bevy/prompts` |
+| a Godot project: its scenes and resources scripted from TypeScript, run headless, recorded as frames to use as footage | `bevy/godot` |
 | shapes: boxes to modelled solids, blended organic bodies (`sdf`), trees, terrain, rocks and plants (`grow`), 3D letters | `bevy/meshes` |
 | moving things: spins, springs, reveals, things arriving later, model clips | `bevy/animation` |
 | a 3D game: state, input, many entities, collisions, state machines | `bevy/games` |
@@ -30,6 +31,8 @@ pieces; then write the file. Each file's example is a complete composition you c
 | an asset to fix in Blender first (scale, pivot, heavy mesh, FBX/OBJ, rig, bake); never a whole scene | `bevy/blender` |
 | a real scene or object from footage as gaussian splats, and animating them (assemble, disperse, morph...) | `bevy/splats` |
 | liquids and goo: coffee dumped from a mug, a tap's stream, honey, things melting | `bevy/liquids` |
+| water: seas, lakes and pools; waves, reflection, refraction, absorption, caustics, foam | `bevy/water` |
+| ray-traced light (Solari): what it lights and traces, glowing lamps, rooms that don't leak, cuts, metering | `bevy/solari` |
 | bloom, fog, tone mapping, exposure, fisheye and lens distortion, motion blur | `bevy/post` |
 | how much the scene can hold, what isn't there yet | `bevy/limits` |
 
@@ -62,10 +65,12 @@ the rest come from `raea`.
    A Mesh that appears, disappears or swaps places with one of the same shape needs a `name`.
 5. **A shape is fixed for the life of a part.** Animate position, rotation, scale, colour, opacity, glow,
    roughness and metalness; don't change `args` or `shape` frame to frame (that's a new part each frame).
-6. **One camera; each frame's own effects.** The first camera in the tree is used. The effects (the sky, Bloom, Fog,
-   Grade, ToneMapping, Shadows and the rest) and each light's colour, shadows and shafts take each frame's values, so
-   shots with different looks are one composition and one render, not one render a shot joined after; the lens
-   (Fisheye, LensDistortion) and MotionBlur animate per frame too.
+6. **One camera a frame; each frame's own effects.** The first active camera in the tree is the piece's: give each
+   shot its own `<Camera3d>` and switch them with `is_active={...}`, so a cut between cameras is one render, not one
+   render a camera joined after (the frame another camera becomes active is drawn as a shot rendered alone starts,
+   with no motion blur from the other camera's frame). The effects (the sky, Bloom, Fog, Grade, ToneMapping, Shadows
+   and the rest) and each light's colour, shadows and shafts take each frame's values, so shots with different looks
+   are one composition and one render too; the lens (Fisheye, LensDistortion) and MotionBlur animate per frame.
 7. **Import what you use.** Every component in the scene comes from its module in the import line (`Camera3d`
    from `raea/camera`, `Mesh3d` and `Cuboid` from `raea/mesh`, `StandardMaterial` from `raea/pbr`, the lights from
    `raea/light`, `Transform` from `raea/transform`, `Canvas3D`, `Bloom` and the rest from `raea/3d`); a missing one

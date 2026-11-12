@@ -8,6 +8,20 @@ use super::*;
 /// both, paired x3, lightspeed T1/G6): the media engine is the bound, not the queue.
 pub(crate) const VT_INFLIGHT: usize = 3;
 
+/// Why a full queue doesn't just wait (#83): above 4096x2304 (H.264 Level 5.2's ceiling) VideoToolbox gives an H.264
+/// session its software encoder, though VTCompressionSessionCreate succeeds, and that one emits nothing until it holds
+/// 13 frames. With VT_INFLIGHT out, a push then waited forever (and the watchdog blamed the GPU). So a queue that's full
+/// with nothing out for VT_STUCK has its frames completed (what RAEA_VT_FLUSH does), and every full queue after that;
+/// nothing out for VT_DEADLINE fails the render instead of hanging it. Hardware encoders never go quiet that long.
+const VT_STUCK: std::time::Duration = std::time::Duration::from_millis(300);
+const VT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The render's error when the encoder gave nothing back for VT_DEADLINE.
+fn vt_stuck(o: &EncodeOpts, hevc10: bool) -> String {
+    let codec = if hevc10 { "HEVC" } else { "H.264" };
+    format!("VideoToolbox: no frame came out of the {codec} encoder for {} s at {}x{}; --10bit encodes HEVC on the hardware up to 8K", VT_DEADLINE.as_secs(), o.width, o.height)
+}
+
 pub(crate) struct VtState {
     pub(crate) inflight: usize,
     /// RAEA_MEM_MARKS diagnostics: the most frames ever in flight, bytes of samples kept
@@ -42,6 +56,8 @@ pub(crate) struct VtEncoder {
     pub(crate) own_pool: Option<(objc2_core_foundation::CFRetained<CVPixelBufferPool>, i32)>,
     /// HEVC Main10 from P010 (Backend::encoder_10bit)
     pub(crate) hevc10: bool,
+    /// a full queue went quiet once (VT_STUCK): every full queue since completes its frames at once
+    pub(crate) rescued: bool,
 }
 
 pub(crate) unsafe extern "C-unwind" fn vt_output(
@@ -232,7 +248,7 @@ impl VtEncoder {
                 }
                 None => None,
             };
-            Ok(VtEncoder { session, shared, out: out.to_path_buf(), opts: o.clone(), cap, n: 0, flush, own_pool, hevc10 })
+            Ok(VtEncoder { session, shared, out: out.to_path_buf(), opts: o.clone(), cap, n: 0, flush, own_pool, hevc10, rescued: false })
         }
     }
 
@@ -241,8 +257,28 @@ impl VtEncoder {
         let t0 = std::time::Instant::now();
         {
             let mut st = self.shared.st.lock().unwrap();
+            let mut quiet = std::time::Instant::now();
             while st.inflight >= self.cap && st.err.is_none() {
-                st = self.shared.cv.wait(st).unwrap();
+                if quiet.elapsed() >= VT_DEADLINE {
+                    return Err(vt_stuck(&self.opts, self.hevc10));
+                }
+                let before = st.inflight;
+                if self.rescued || quiet.elapsed() >= VT_STUCK {
+                    if !self.rescued {
+                        self.rescued = true;
+                        eprintln!("raea encode: VideoToolbox's encoder holds frames back at {}x{} (its software H.264 above 4096x2304), so they're completed as they go, slower; --10bit encodes HEVC on the hardware", self.opts.width, self.opts.height);
+                    }
+                    // unlocked: the output callback takes the lock for each frame complete_frames lets out
+                    drop(st);
+                    unsafe { self.session.complete_frames(objc2_core_media::kCMTimeInvalid) };
+                    st = self.shared.st.lock().unwrap();
+                }
+                if st.inflight >= before && st.err.is_none() {
+                    st = self.shared.cv.wait_timeout(st, VT_STUCK).unwrap().0;
+                }
+                if st.inflight < before {
+                    quiet = std::time::Instant::now();
+                }
             }
             if let Some(e) = st.err.take() {
                 return Err(e);
@@ -296,6 +332,14 @@ impl VtEncoder {
             }
         }
         Ok(())
+    }
+}
+
+/// An encoder dropped on an error (a stuck one's VT_DEADLINE among them) still holding frames: the session is torn down
+/// first, so no output callback reaches its shared state once that's freed. finish() has invalidated it already.
+impl Drop for VtEncoder {
+    fn drop(&mut self) {
+        unsafe { self.session.invalidate() };
     }
 }
 
@@ -367,8 +411,16 @@ impl VideoEncoder for VtEncoder {
         }
         {
             let mut st = self.shared.st.lock().unwrap();
+            let mut quiet = std::time::Instant::now();
             while st.inflight > 0 && st.err.is_none() {
-                st = self.shared.cv.wait(st).unwrap();
+                if quiet.elapsed() >= VT_DEADLINE {
+                    return Err(vt_stuck(&self.opts, self.hevc10));
+                }
+                let before = st.inflight;
+                st = self.shared.cv.wait_timeout(st, VT_STUCK).unwrap().0;
+                if st.inflight < before {
+                    quiet = std::time::Instant::now();
+                }
             }
         }
         unsafe { self.session.invalidate() };

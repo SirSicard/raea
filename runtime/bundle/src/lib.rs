@@ -127,6 +127,8 @@ pub struct CompOpts {
     pub h: u32,
     pub fps: f64,
     pub frames: i64,
+    /// each of `--w --h --fps --frames` given (flag, the config's key, value): the entry says one the composition overrides
+    pub given: Vec<(&'static str, &'static str, f64)>,
     /// the Clock's words, perception and input (`--words`, `--perception`, `--input`), as JSON for the entry
     pub words: Option<Value>,
     pub perception: Option<Value>,
@@ -170,10 +172,8 @@ pub fn input_file(path: &str) -> R<Value> {
         let body = &body[..body.find('}').unwrap_or(b - a - 1)];
         let mut m = Map::new();
         for kv in body.split(',') {
-            if let Some((k, v)) = kv.split_once(':') {
-                if let (Ok(k), Ok(v)) = (k.trim().parse::<i64>(), v.trim().parse::<f64>()) {
-                    m.insert(k.to_string(), json!(v));
-                }
+            if let Some((k, v)) = kv.split_once(':') && let (Ok(k), Ok(v)) = (k.trim().parse::<i64>(), v.trim().parse::<f64>()) {
+                m.insert(k.to_string(), json!(v));
             }
         }
         steps.insert(dom_key(name), Value::Object(m));
@@ -192,6 +192,7 @@ pub fn comp_opts(args: &[String]) -> R<CompOpts> {
         h: n("--h")?.unwrap_or(1920.0) as u32,
         fps: n("--fps")?.unwrap_or(30.0),
         frames: n("--frames")?.unwrap_or(60.0) as i64,
+        given: [("--w", "width"), ("--h", "height"), ("--fps", "fps"), ("--frames", "durationInFrames")].into_iter().filter_map(|(k, key)| Some((k, key, n(k).ok()??))).collect(),
         words: flag(args, "--words").map(|p| json_file(&p).and_then(|v| words_shape(&v).map(|_| v).map_err(|e| format!("--words {p}: {e}")))).transpose()?,
         perception: flag(args, "--perception").map(|p| json_file(&p)).transpose()?,
         input: flag(args, "--input").map(|p| input_file(&p)).transpose()?,
@@ -211,20 +212,16 @@ pub fn bundle_composition(tsx: &Path, out_js: &Path, o: &CompOpts, portable: Opt
     // a bundle made from these same inputs before is copied instead of bundled again (lightspeed F5): the copying and
     // bundling on every open, render and play. Not a portable one (it copies media beside it)
     let cached = if portable.is_none() { bundle_cache(tsx, o) } else { None };
-    if let Some(c) = &cached {
-        if std::fs::copy(c, out_js).is_ok() {
-            let _ = std::fs::File::options().append(true).open(c).and_then(|f| f.set_modified(std::time::SystemTime::now()));
-            return Ok(());
-        }
+    if let Some(c) = &cached && std::fs::copy(c, out_js).is_ok() {
+        let _ = std::fs::File::options().append(true).open(c).and_then(|f| f.set_modified(std::time::SystemTime::now()));
+        return Ok(());
     }
     bundle_fresh(tsx, out_js, o, portable)?;
     if let Some(c) = cached {
         // written whole, then moved in
         let tmp = c.with_extension(format!("{}.tmp", std::process::id()));
-        if c.parent().is_some_and(|d| std::fs::create_dir_all(d).is_ok()) && std::fs::copy(out_js, &tmp).is_ok() && std::fs::rename(&tmp, &c).is_ok() {
-            if let Some(d) = c.parent() {
-                prune_cache(d, "js", 64);
-            }
+        if let Some(d) = c.parent() && std::fs::create_dir_all(d).is_ok() && std::fs::copy(out_js, &tmp).is_ok() && std::fs::rename(&tmp, &c).is_ok() {
+            prune_cache(d, "js", 64);
         } else {
             let _ = std::fs::remove_file(&tmp);
         }

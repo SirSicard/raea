@@ -2,6 +2,7 @@
 // materials), pictures on cards, instanced copies, gizmo lines and decals.
 import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { paint, texture } from "./materials";
 import { vec } from "./lights";
 
@@ -21,7 +22,8 @@ export function place(o: THREE.Object3D, p: Props) {
 }
 
 // ---- glTF ----
-const gltfLoader = new GLTFLoader();
+// meshopt-compressed models (gltf-transform's meshopt: a web build's models a fraction of the size) decode in place
+const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const gltfs = new Map<string, Promise<GLTF>>();
 export const loadGltf = (src: string) => {
   let g = gltfs.get(src);

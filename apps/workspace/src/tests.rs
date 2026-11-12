@@ -10,7 +10,14 @@ fn a_name_is_its_folder() {
 fn a_spec_module_is_tidy_typescript() {
     // keys unquoted where they can be, nulls and empty lists left out, whole numbers whole, short string lists inline
     let v = json!({"id": "delivery", "help": null, "tags": [], "n": 45.0, "options": ["9:16", "16:9"], "odd-key": 1});
-    assert_eq!(ts_literal(&v, 0), "{\n  id: \"delivery\",\n  n: 45,\n  \"odd-key\": 1,\n  options: [\"9:16\", \"16:9\"],\n}");
+    // the keys' order is serde_json's: sorted on its own, as written when a crate built alongside turns on
+    // preserve_order (raea-cli does), so the lines are held as a set (#90)
+    fn lines(s: &str) -> Vec<&str> {
+        let mut l: Vec<&str> = s.lines().collect();
+        l.sort_unstable();
+        l
+    }
+    assert_eq!(lines(&ts_literal(&v, 0)), lines("{\n  id: \"delivery\",\n  n: 45,\n  \"odd-key\": 1,\n  options: [\"9:16\", \"16:9\"],\n}"));
 }
 
 #[test]

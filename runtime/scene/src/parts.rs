@@ -264,7 +264,7 @@ pub(crate) fn meshes_rows(tr: &Tracks, names: &[String], p: &mut Program) {
             row.insert("receive".into(), V::N(0.0));
         }
         layers_column(&mut row, &its[0].props);
-        instances_column(&mut row, &its);
+        instances_column(p, &mut row, &id, &its);
         // its geometry's own vertex attributes (JSON, Mesh3d `attributes`), from the first frame: raea-sys-mesh with_attributes
         if let Some(Value::String(a)) = its[0].props.get("attributes") {
             row.insert("attributes".into(), V::S(a.clone()));
@@ -358,7 +358,7 @@ pub(crate) fn texts_rows(tr: &Tracks, names: &[String], p: &mut Program) {
                         m.insert(to.into(), v.clone());
                     }
                 }
-                Item { kind: "glyph", props: std::sync::Arc::new(Map::new()), shape: None, material: None, world: local(&m) }
+                Item { kind: "glyph", props: std::sync::Arc::new(Map::new()), shape: None, material: None, at: None, world: local(&m) }
             }).collect();
             placement(p, &mut row, &gid, &moved);
             let colors: Vec<String> = gs.iter().map(|g| hex(g.get("c")).unwrap_or("#ffffff".into())).collect();
@@ -397,7 +397,7 @@ mod light_rotation_tests {
     use super::*;
 
     fn sun(props: serde_json::Value, world: Mat4) -> Item {
-        Item { kind: "directional", props: std::sync::Arc::new(props.as_object().unwrap().clone()), shape: None, material: None, world }
+        Item { kind: "directional", props: std::sync::Arc::new(props.as_object().unwrap().clone()), shape: None, material: None, at: None, world }
     }
 
     #[test]

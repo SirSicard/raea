@@ -1,6 +1,6 @@
 ---
 title: "raea setup"
-summary: "Find Blender, or download its current LTS, and install its MCP add-on."
+summary: "Find Blender, or download its current LTS, and install raea's add-on and the MCP add-on."
 order: 128
 sources: ["apps/tools/src/blender.rs"]
 ---
@@ -18,7 +18,8 @@ raea setup blender
 ## Usage
 
 ```sh
-raea setup blender [--check] [--download]   (find Blender or download the LTS into ~/.raea/tools/blender, and install its MCP add-on)
+raea setup blender [--check] [--download]   (find Blender or download the LTS into ~/.raea/tools/blender, and install raea's add-on and the MCP add-on)
+raea setup godot [--check]   (download Godot 4.6.1 with GodotJS, its TypeScript bindings (MIT), into ~/.raea/tools/godot: JavaScriptCore on the Mac, QuickJS on Windows and Linux; raea's own build (the Mac's notarized), else GodotJS's, each checked against its pinned sha256)
 ```
 
 Headless: it needs nothing running and opens no window. Takes up to 1 argument besides its flags.

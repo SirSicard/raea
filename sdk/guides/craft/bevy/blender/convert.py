@@ -151,7 +151,8 @@ def main():
     found = maps(folder) if os.path.isdir(folder) else {}
     wired = sum(wire(m, found) for m in {s.material for o in meshes for s in o.material_slots if s.material}) if found else 0
     shrunk = shrink(int(opt(a, "--max-texture", "2048")))
-    missing = [i.filepath for i in bpy.data.images if i.source == "FILE" and not os.path.isfile(bpy.path.abspath(i.filepath))]
+    # an image packed in the file (a .glb's own textures) has no path and isn't missing
+    missing = [i.filepath for i in bpy.data.images if i.source == "FILE" and not i.packed_file and not os.path.isfile(bpy.path.abspath(i.filepath))]
     if missing and not found:
         fail(f"textures it names are missing ({', '.join(missing[:3])}): give --textures DIR")
     save(out, src, side, {"script": NAME, "from": os.path.basename(src), "scale": s, "texturesWired": wired, "texturesShrunk": shrunk})

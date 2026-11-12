@@ -193,6 +193,9 @@ export interface PerspectiveCameraProps {
   clear?: "none";
   bg?: string;
   viewport?: { physical_position: [number, number]; physical_size: [number, number] };
+  /** false: it draws nothing this frame (<Camera3d is_active>), and the first camera that does is the piece's; a frame
+   *  where another camera becomes the piece's is a cut (docs/rerender.feature RR2) */
+  active?: boolean;
 }
 
 /** The viewpoint the scene is drawn from.
@@ -205,6 +208,6 @@ export function PerspectiveCamera({ fov = 50, children, ...rest }: PerspectiveCa
   if (rest.up !== undefined) checkVec("PerspectiveCamera", "up", rest.up);
   const v = rest.view;
   if (v !== undefined && !(v && v.width > 0 && v.height > 0 && Number.isFinite(v.x) && Number.isFinite(v.y))) throw new TypeError(`PerspectiveCamera: view is { width, height, x, y } in frame pixels, got ${JSON.stringify(v)}`);
-  useCamera3d({ position: rest.position, lookAt: rest.lookAt, fov, up: rest.up });
+  useCamera3d({ position: rest.position, lookAt: rest.lookAt, fov, up: rest.up }, rest.active !== false);
   return node3d("PerspectiveCamera", { ...rest, fov }, children);
 }

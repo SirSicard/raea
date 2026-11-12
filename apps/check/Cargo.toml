@@ -15,4 +15,6 @@ raea-core-facts = { path = "../../core/facts" }
 raea-io-trace = { path = "../../io/trace" }
 # caption contrast and loudness, measured as `raea world` measures a render (DR2)
 raea-sys-measure = { path = "../../systems/measure" }
+# the flashing screen (WCAG 2.3.1), split out to keep this crate small
+raea-app-check-flash = { path = "flash" }
 serde_json = "1"

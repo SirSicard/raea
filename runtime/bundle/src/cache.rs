@@ -11,7 +11,9 @@ use super::*;
 pub fn export_cache(tsx: &Path, js: &Path, out: &Path, args: &[String]) -> Option<PathBuf> {
     let ext = out.extension()?.to_str()?.to_ascii_lowercase();
     // RAEA_FRAME_LOG measures a render, so it renders (a hit would hand back the earlier file and write no log)
-    if !matches!(ext.as_str(), "mp4" | "mov") || std::env::var_os("RAEA_AUDIO_BOUNCE").is_some() || std::env::var_os("RAEA_FRAME_LOG").is_some() {
+    // RAEA_HIDE_MEDIA and RAEA_HIDE_LAYERS draw a page the bundle doesn't say (CSS the render adds): never the cache's
+    let hides = std::env::var_os("RAEA_HIDE_MEDIA").is_some() || std::env::var_os("RAEA_HIDE_LAYERS").is_some();
+    if !matches!(ext.as_str(), "mp4" | "mov") || hides || std::env::var_os("RAEA_AUDIO_BOUNCE").is_some() || std::env::var_os("RAEA_FRAME_LOG").is_some() {
         return None;
     }
     let root = match std::env::var("RAEA_EXPORT_CACHE") {

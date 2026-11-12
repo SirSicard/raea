@@ -349,7 +349,8 @@ export class CanvasRenderingContext2D_ {
     const cx = p0[0] + n[0] * r, cy = p0[1] + n[1] * r;
     const a0 = Math.atan2(p0[1] - cy, p0[0] - cx), a1 = Math.atan2(p1[1] - cy, p1[0] - cx);
     P.line(p0[0], p0[1]);
-    P.ellipse(cx, cy, r, r, 0, a0, a1, cross < 0);
+    // the short way round, between the tangent points: clockwise on screen (y down) when the corner turns that way
+    P.ellipse(cx, cy, r, r, 0, a0, a1, cross > 0);
   }
 
   // -------- drawing

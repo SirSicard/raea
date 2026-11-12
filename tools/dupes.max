@@ -13,5 +13,11 @@
 # into raea_sys_frame::json_f32; begin_live and app_mut gone; await_models split by target); the one left is an
 # accessor matched by shape: Engine::world_mut and Opening::world_mut (the canvas window goes on before the engine is
 # finished, its camera after) with runtime/page bevy_page.rs BevyPage::app
-exact=294
-near=56
+# Raised once more, 11-11, by the CapCut export (docs/capcut.feature): near 56 -> 59. Its real copies were folded
+# (io/apple's cf_key reused, runtime-bundle's flag, frames_in shared with render.rs's exposure pass, a PNG read through
+# image, the movie writers' frame counts kept once, a byte-concat wrapper gone); the three left match by shape only:
+#   io/capcut store.rs:67 (tasklist's stdout, lower-cased; sdk/ui/parity main.rs:88 trims a command's stdout),
+#   io/capcut build.rs:24 parse (serde_json::from_str + expect; engine/native node.rs:172 js_string, to_string), and
+#   apps/capcut plan.rs:67 (a box moved more than 1 px; systems/layout mod.rs:406, within 1.5 px)
+exact=293
+near=59

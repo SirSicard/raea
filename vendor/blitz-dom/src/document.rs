@@ -2532,7 +2532,10 @@ impl BaseDocument {
         let mut pos = crate::util::Point { x: 0.0, y: 0.0 };
         let mut current = Some(node_id);
         while let Some(id) = current {
-            let node = &self.nodes[id];
+            // raea: a containing-block link is what the last construction and layout left, and freeing a node doesn't
+            // clear links to it (a `display: none` element's descendants still point at its old anonymous blocks):
+            // the walk stops at a missing node rather than panicking on its key (#108), as paint_tree's does
+            let Some(node) = self.nodes.get(id) else { break };
             pos.x += node.unrounded_layout().location.x - node.scroll_offset().x as f32;
             pos.y += node.unrounded_layout().location.y - node.scroll_offset().y as f32;
             current = node.containing_block();
@@ -2550,7 +2553,8 @@ impl BaseDocument {
         let mut any = false;
         let mut current = Some(node_id);
         while let Some(id) = current {
-            let node = &self.nodes[id];
+            // raea: stops at a missing node, as physical_unrounded_geometry does (#108)
+            let Some(node) = self.nodes.get(id) else { break };
             if id != node_id {
                 let s = node.scroll_offset();
                 m = Affine::translate((-s.x, -s.y)) * m;
@@ -2577,6 +2581,19 @@ impl BaseDocument {
         })
     }
 
+    /// raea: whether `node_id` or an ancestor is `display: none`, so it generates no box (#108).
+    fn in_display_none(&self, node_id: NodeId) -> bool {
+        let mut current = Some(node_id);
+        while let Some(id) = current {
+            let Some(node) = self.nodes.get(id) else { return false };
+            if node.primary_styles().is_some_and(|s| stylo_taffy::convert::display(s.get_box().display) == taffy::Display::None) {
+                return true;
+            }
+            current = node.parent;
+        }
+        false
+    }
+
     /// Computes the size and position of the `Node` relative to the viewport
     pub fn get_client_bounding_rect(&self, node_id: NodeId) -> Option<BoundingRect> {
         // Non-atomic inline elements have no layout box of their own: return
@@ -2586,6 +2603,11 @@ impl BaseDocument {
         }
 
         let node = self.get_node(node_id)?;
+        // raea: an element with no box (it or an ancestor is `display: none`) answers Chrome's zero rect, not whatever
+        // its last layout left (#108)
+        if self.in_display_none(node_id) {
+            return Some(BoundingRect { x: 0.0, y: 0.0, width: 0.0, height: 0.0 });
+        }
         // raea: a table row or row group has no box of its own (its cells are the table grid's items): its rect is
         // its cells' union, as Chrome's row box spans them
         if let Some(d) = node.display_style()

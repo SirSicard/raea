@@ -30,6 +30,7 @@ pub struct Player<'a> {
     /// the sound, opened on the first play; None after it couldn't be
     sound: Option<Option<Sound>>,
     muted: bool,
+    volume: f32,
     clock: Option<Clock>,
     looping: bool,
     /// the frame (index at fps) last sent while playing, so a frame isn't decoded twice
@@ -45,7 +46,7 @@ impl<'a> Player<'a> {
             Source::Audio(a) => (a.duration(), 0.0),
         };
         let fps = if fps.is_finite() && fps > 1.0 { fps } else { 30.0 };
-        Player { path, source, duration, fps, sound: None, muted: false, clock: None, looping: false, shown: None, told: None }
+        Player { path, source, duration, fps, sound: None, muted: false, volume: 1.0, clock: None, looping: false, shown: None, told: None }
     }
 
     /// Answers the element's asks until it's gone (its stream dropped).
@@ -75,6 +76,12 @@ impl<'a> Player<'a> {
                         self.muted = m;
                         if let Some(Some(s)) = &self.sound {
                             s.set_muted(m);
+                        }
+                    }
+                    Cmd::Volume(v) => {
+                        self.volume = v;
+                        if let Some(Some(s)) = &self.sound {
+                            s.set_volume(v);
                         }
                     }
                 }
@@ -127,7 +134,8 @@ impl<'a> Player<'a> {
                 // a video's sound track, decoded once, on the first play (a video only looked at never pays for it)
                 Source::Video(_) => raea_io_media::preferred().into_iter().find_map(|b| b.decode_audio(self.path).ok()).filter(|a| a.len() > 0),
             };
-            self.sound = Some(audio.and_then(|a| Sound::open(a, self.muted).inspect_err(|e| bevy::log::debug!("raea-runtime-js: media plays on the wall's clock: {e}")).ok()));
+            let volume = self.volume;
+            self.sound = Some(audio.and_then(|a| Sound::open(a, self.muted).inspect(|s| s.set_volume(volume)).inspect_err(|e| bevy::log::debug!("raea-runtime-js: media plays on the wall's clock: {e}")).ok()));
         }
         self.shown = None;
         self.told = None;

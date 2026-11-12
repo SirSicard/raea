@@ -78,15 +78,26 @@ pub fn mount(world: &mut World, m: Mount) -> Result<Entity, String> {
     Ok(page)
 }
 
-/// The page at the window's size.
-pub fn size(win: Query<&Window, With<PrimaryWindow>>, page: Res<HostPage>, mut pages: Query<&mut raea_sys_page::Page>) {
+/// The page at the window's size in points, painted at the window's scale on screen: on a Retina display the page's
+/// image is twice the points each way and the document lays out with hidpi_scale 2, so text and hairlines are drawn
+/// at the display's pixels (v0.1.1 painted every window at 1x and stretched it: "UI renders at 1x on Retina"). The
+/// scale is read every frame, so a window dragged to another display follows it. Headless, the image target's scale.
+pub fn size(win: Query<&Window, With<PrimaryWindow>>, page: Res<HostPage>, target: Option<Res<crate::inject::Target>>, mut pages: Query<&mut raea_sys_page::Page>) {
     let Ok(w) = win.single() else { return };
     let want = UVec2::new(w.width().round() as u32, w.height().round() as u32);
+    let scale = page_scale(target.as_deref().is_none_or(|t| t.windowed), w, target.as_deref().map_or(1.0, |t| t.scale));
     if let Ok(mut p) = pages.get_mut(page.0)
-        && p.size != want
+        && (p.size != want || p.scale != scale)
     {
         p.size = want;
+        p.scale = scale;
     }
+}
+
+/// The scale a page is painted at: the window's on screen (a Retina display's 2, a window's override), else the
+/// headless image's.
+pub fn page_scale(windowed: bool, win: &Window, headless: f32) -> f32 {
+    if windowed { (win.scale_factor() as f32).max(0.5) } else { headless }
 }
 
 /// The page's image on the node that shows it, once raea-page made it (and again when a resize remade it).

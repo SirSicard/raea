@@ -3,6 +3,15 @@
 [target.aarch64-apple-darwin]
 linker = "tools/link-jit.sh"
 
+# every Windows executable's main thread gets 8 MB of stack, as on macOS and Linux (Windows' default is 1 MB). The
+# desktop app's raea-page-host overflowed 1 MB inside a window callback (#112); engine/cli/build.rs did this for raea
+# alone. A DLL's link ignores /STACK.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/STACK:8388608"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "link-arg=/STACK:8388608"]
+
 # no strip after linking: rustc's strip pass re-signs the binary and drops the entitlement (release has no debug info
 # of its own; std's stays)
 [profile.release]

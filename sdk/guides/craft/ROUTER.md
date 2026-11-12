@@ -49,8 +49,9 @@ leads. raea will add modes as its work grows; `raea context` says when a brief n
 
 1. **Context:** `raea context`.
 2. **Shape:** a confirmed brief (who, the belief, the mode, the voice).
-3. **Plan:** for a pitch, an explain or a story, a storyboard file (scene · on screen · narration · payoff) and a
-   camera map, approved by the person before anything renders.
+3. **Plan:** for a pitch, an explain or a story, a storyboard file (scene · on screen · narration · payoff), a
+   camera map and its cuts as a chain of hooks on the thirds (`raea guide match-cuts`: where each shot takes the eye
+   in and leaves it), approved by the person before anything renders.
 4. **Direction:** when the look or the structure is open, offer real options made with raea, and write the chosen
    one into the deliverable's brief as a section headed "Direction".
 5. **The floor:** read it right before you edit.

@@ -18,7 +18,8 @@ SB
 ok=0
 step() {  # NAME DIR ARGS...
   local n=$1 d=$2; shift 2; local t0=$(date +%s)
-  (cd $d && sandbox-exec -f $R/sb env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME=$R/home RAEA_NO_TREE=1 RAEA_API=http://127.0.0.1:9 RAEA_GEN_API=http://127.0.0.1:9 $R/raea/bin/raea "$@") > $R/$n.log 2>&1
+  # RAEA_AUDIO_MUTE: the play step's game makes no sound on the Mac's speakers while someone works at it
+  (cd $d && sandbox-exec -f $R/sb env -i PATH=/usr/bin:/bin:/usr/sbin:/sbin HOME=$R/home RAEA_NO_TREE=1 RAEA_AUDIO_MUTE=1 RAEA_API=http://127.0.0.1:9 RAEA_GEN_API=http://127.0.0.1:9 $R/raea/bin/raea "$@") > $R/$n.log 2>&1
   local code=$?; echo "mac $n: exit $code, $(( $(date +%s) - t0 ))s"; grep -v '^\s*$' $R/$n.log | tail -2 | cut -c1-160
   [ $code = 0 ] || ok=1
 }

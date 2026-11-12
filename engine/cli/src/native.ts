@@ -35,6 +35,10 @@ function engineRun(a: string[]): string {
 const engineJson = (a: string[]): any => JSON.parse(engineRun(a));
 
 const VIDEO = ["mp4", "mov", "m4v", "mkv", "webm"];
+/** a take with sound alone (a voice recording, a bed): cut on its words as a video is, played as <Audio> (#89) */
+const AUDIO = ["wav", "mp3", "m4a", "aac", "flac", "aif", "aiff", "ogg", "opus"];
+const extOf = (f: string) => extname(f).slice(1).toLowerCase();
+const isAudio = (f: string) => AUDIO.includes(extOf(f));
 
 /** Every take under media/: its path from the project's root */
 function takes(): string[] {
@@ -43,7 +47,7 @@ function takes(): string[] {
     for (const e of existsSync(at(dir)) ? readdirSync(at(dir), { withFileTypes: true }) : []) {
       const p = `${dir}/${e.name}`;
       if (e.isDirectory()) walk(p);
-      else if (VIDEO.includes(extname(e.name).slice(1).toLowerCase())) out.push(p);
+      else if (VIDEO.includes(extOf(e.name)) || AUDIO.includes(extOf(e.name))) out.push(p);
     }
   };
   walk("media");
@@ -115,7 +119,8 @@ function hearTake(take: string, out: string) {
 function cutPlan(take: string, ws: Word[], lines: string[]): { plan: [number, number, string][]; notes: string[] } {
   const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}'\s]/gu, "");
   const toks = ws.map((w) => norm(w.text).trim());
-  const cuts = (engineJson(["media", "cuts", at(take), "--threshold", "0.08"]).cuts as { at: number }[]).map((c) => c.at);
+  // a sound-only take has no jump cuts to keep off, and its grid is the edit's usual 30 (a probe has no video fps)
+  const cuts = isAudio(take) ? [] : (engineJson(["media", "cuts", at(take), "--threshold", "0.08"]).cuts as { at: number }[]).map((c) => c.at);
   const fps = (engineJson(["media", "probe", at(take)]).video?.fps as number) || 30;
   let from = 0;
   const spans: [number, number][] = [];
@@ -172,7 +177,7 @@ function cutPlan(take: string, ws: Word[], lines: string[]): { plan: [number, nu
 const framesOf = (from: number, to: number, fps: number) => Math.max(1, Math.round((to - from) * fps));
 const ms = (s: number) => Math.round(s * 1000) / 1000;
 
-type Clip = { take: string; file: string; from: number; to: number; line: string };
+type Clip = { take: string; file: string; from: number; to: number; line: string; kind?: "video" | "audio" };
 
 /** `raea cut`'s host step: the clips for the lines (or --at spans), the words in the edit's frames, and what was cut */
 function cut(a: { take: string; lines: string[]; spans: number[][]; keep: Clip[] }) {
@@ -180,19 +185,20 @@ function cut(a: { take: string; lines: string[]; spans: number[][]; keep: Clip[]
   if (!a.lines.length && !a.spans.length) throw new Error(`cut needs lines ("what's said") or spans (--at A-B, in the take's seconds)`);
   const edit = shape();
   const stem = basename(file, extname(file));
+  const kind = isAudio(file) ? "audio" as const : "video" as const;
   const clips: Clip[] = [...a.keep];
   let notes: string[] = [];
   if (a.lines.length) {
     const r = cutPlan(file, words(file, true), a.lines);
     notes = r.notes;
-    for (const [from, to, line] of r.plan) clips.push({ take: stem, file, from: ms(from), to: ms(to), line });
+    for (const [from, to, line] of r.plan) clips.push({ take: stem, file, from: ms(from), to: ms(to), line, kind });
   }
   const { dur } = probeOf(file);
   for (const [s, e] of a.spans) {
     const [from, to] = [Math.max(s, 0), dur > 0 ? Math.min(e, dur) : e];
     if (!(to > from)) throw new Error(`the span ${s}-${e} is outside ${file} (${dur.toFixed(1)} s)`);
     const line = words(file).filter((w) => w.from >= from - 0.02 && w.to <= to + 0.08).map((w) => w.text).join(" ");
-    clips.push({ take: stem, file, from: ms(from), to: ms(to), line });
+    clips.push({ take: stem, file, from: ms(from), to: ms(to), line, kind });
   }
   // the words in the edit's frames, for captions (useWords())
   let t = 0;
@@ -256,6 +262,8 @@ function perception(edit: { width: number; height: number; fps: number }, clips:
   for (const c of clips) {
     const mid = (c.from + c.to) / 2;
     const key = `${c.file}|${Math.floor(mid * 10)}`;
+    // a sound-only clip has no face to find: the band alone
+    if (!seen.has(key) && (c.kind === "audio" || isAudio(c.file))) seen.set(key, undefined);
     if (!seen.has(key)) {
       let face: Box | undefined;
       try {

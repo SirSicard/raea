@@ -1,0 +1,35 @@
+# raea cloud on one machine with Docker (docs/cloud.feature CL9): the image, its port and the home folder on a named
+# volume (the agents' sign-ins, raea's settings and the workspace). From sdk/cloud/deploy:
+#
+#   export RAEA_CLOUD_TOKEN=$(openssl rand -hex 32)      # keep it: every request carries it
+#   docker compose up -d                                 # builds the image the first time
+#   curl -H "authorization: Bearer $RAEA_CLOUD_TOKEN" localhost:8080/v1/health
+#
+# With an NVIDIA GPU: docker compose -f compose.yaml -f compose.gpu.yaml up -d
+# Agents that take a key read it from here: set it in the shell (or an .env file beside this one) before `up`.
+services:
+  raea:
+    image: ${RAEA_CLOUD_IMAGE:-raea-cloud:${RAEA_VERSION:-0.1.1}}
+    build:
+      context: ..
+      dockerfile: image/Dockerfile
+      args:
+        RAEA_VERSION: ${RAEA_VERSION:-0.1.1}
+        AGENTS: ${AGENTS:-kimi-code}
+    platform: linux/amd64
+    ports:
+      - "${RAEA_CLOUD_BIND:-127.0.0.1}:${RAEA_CLOUD_PORT:-8080}:8080"
+    environment:
+      RAEA_CLOUD_TOKEN: ${RAEA_CLOUD_TOKEN:?set RAEA_CLOUD_TOKEN (openssl rand -hex 32)}
+      RAEA_AGENT: ${RAEA_AGENT:-}
+      # the agents' own keys, passed through when set
+      ANTHROPIC_API_KEY:
+      CLAUDE_CODE_OAUTH_TOKEN:
+      OPENAI_API_KEY:
+      GEMINI_API_KEY:
+      OPENROUTER_API_KEY:
+    volumes:
+      - home:/home/raea
+    restart: unless-stopped
+volumes:
+  home:

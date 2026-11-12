@@ -1760,7 +1760,8 @@ impl Node {
                 return Some(node);
             }
             let id = node.layout_parent.get()?;
-            node = self.with(id);
+            // raea: a layout parent freed since (a reconstruction's old anonymous block): no inline root (#108)
+            node = self.tree().get(id)?;
         }
     }
 

@@ -1,0 +1,23 @@
+{
+  "name": "@raea/cloud",
+  "license": "FSL-1.1-ALv2",
+  "private": true,
+  "version": "0.1.1",
+  "description": "raea and an ACP agent on a server of your own (docs/cloud.feature): one image (image/Dockerfile) with raea's Linux release, any agent the ACP registry lists and a small authenticated server, deploy files for Docker, Compose, Fly Machines and Kubernetes, and a TypeScript client (src/).",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "server", "image", "deploy", "README.md"],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/ws": "8.18.1"
+  }
+}

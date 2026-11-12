@@ -31,7 +31,12 @@ impl Chrome {
     /// The primary window, titled and sized, with this chrome's title bar.
     pub fn window(self, title: &str, size: UVec2) -> Window {
         let inset = self == Self::Inset;
-        let resolution = bevy::window::WindowResolution::new(size.x, size.y);
+        let mut resolution = bevy::window::WindowResolution::new(size.x, size.y);
+        // RAEA_WINDOW_SCALE=2: the window at that scale whatever the display's, so a Retina window can be checked on a
+        // 1x display (the page paints at the window's scale: raea-page-host page.rs size)
+        if let Some(s) = std::env::var("RAEA_WINDOW_SCALE").ok().and_then(|s| s.parse::<f32>().ok()).filter(|s| *s > 0.0) {
+            resolution = resolution.with_scale_factor_override(s);
+        }
         Window { title: title.into(), resolution, titlebar_transparent: inset, titlebar_show_title: !inset, fullsize_content_view: inset, ..default() }
     }
 

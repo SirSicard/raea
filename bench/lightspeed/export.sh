@@ -48,9 +48,9 @@ render() {
   local edit=$1 out=$2; shift 2
   local log=$out.log clock=$out.clock
   if [ "${TIMES:-}" = 1 ]; then
-    RAEA_EXPORT_CACHE=0 RAEA_TIMES=1 "$MOTION" ci time --to "$clock" -- "$MOTION" render "$edit" -o "$out" "$@" > "$log.out" 2> "$log.err"
+    RAEA_EXPORT_CACHE=0 RAEA_TIMES=1 RAEA_RENDER_STATS=1 "$MOTION" ci time --to "$clock" -- "$MOTION" render "$edit" -o "$out" "$@" > "$log.out" 2> "$log.err"
   else
-    RAEA_EXPORT_CACHE=0 "$MOTION" ci time --to "$clock" -- "$MOTION" render "$edit" -o "$out" "$@" > "$log.out" 2> "$log.err"
+    RAEA_EXPORT_CACHE=0 RAEA_RENDER_STATS=1 "$MOTION" ci time --to "$clock" -- "$MOTION" render "$edit" -o "$out" "$@" > "$log.out" 2> "$log.err"
   fi
   if [ $? != 0 ]; then
     if [ -s "$log.err" ]; then say_tail "render $edit: " 600 "$log.err" >&2; else say_tail "render $edit: " 600 "$log.out" >&2; fi

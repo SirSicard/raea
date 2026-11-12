@@ -143,8 +143,7 @@ fn measured(args: &[String], taste: Vec<Taste>) -> R<(String, Vec<Issue>, Vec<St
         return Err(format!("no file at {video}\n{USAGE}"));
     }
     let probe = Probe::of(&video)?;
-    let mut issues = Vec::new();
-    let mut passed = Vec::new();
+    let (mut issues, mut passed) = (Vec::new(), Vec::new());
     let manifest: Option<Value> = match flag(args, "--manifest") {
         Some(m) => Some(serde_json::from_str(&std::fs::read_to_string(m).map_err(|e| format!("{m}: {e}"))?).map_err(|e| format!("{m}: {e}"))?),
         None => None,
@@ -180,23 +179,13 @@ fn measured(args: &[String], taste: Vec<Taste>) -> R<(String, Vec<Issue>, Vec<St
 /// `fps`), with `more` (a render's own), worst first then by time.
 fn findings_of(mut issues: Vec<Issue>, more: Vec<Finding>, fps: f64) -> Vec<Finding> {
     issues.sort_by(|a, b| a.p.cmp(&b.p).then(a.at.unwrap_or(0.0).total_cmp(&b.at.unwrap_or(0.0))));
-    finding::ranked(
-        issues
-            .iter()
-            .map(|i| {
-                let f = Finding::new(i.rule, Level::of_rank(i.p), &i.says, "raea check");
-                // an issue at a second is about the frame it falls on
-                match i.at {
-                    Some(t) => {
-                        let fr = (t * fps).round() as i64;
-                        f.frames(fr, fr + 1)
-                    }
-                    None => f,
-                }
-            })
-            .chain(more)
-            .collect(),
-    )
+    let mut found = Vec::new();
+    for i in &issues {
+        // an issue at a second is about the frame it falls on
+        let (f, fr) = (Finding::new(i.rule, Level::of_rank(i.p), &i.says, "raea check"), (i.at.unwrap_or(0.0) * fps).round() as i64);
+        found.push(if i.at.is_some() { f.frames(fr, fr + 1) } else { f });
+    }
+    finding::ranked(found.into_iter().chain(more).collect())
 }
 
 /// The findings (`findings_of`), written to -o as JSON when asked, and the report's text with the count last. True
@@ -244,10 +233,8 @@ fn last_packet_end(video: &str) -> Option<f64> {
 
 impl Probe {
     fn of(video: &str) -> R<Probe> {
-        let out = Command::new("ffprobe")
-            .args(["-v", "error", "-show_entries", "stream=codec_type,width,height,r_frame_rate,duration,start_time:format=duration,start_time", "-of", "json", video])
-            .output()
-            .map_err(|e| format!("ffprobe: {e}"))?;
+        let entries = "stream=codec_type,width,height,r_frame_rate,duration,start_time:format=duration,start_time";
+        let out = Command::new("ffprobe").args(["-v", "error", "-show_entries", entries, "-of", "json", video]).output().map_err(|e| format!("ffprobe: {e}"))?;
         let v: Value = serde_json::from_slice(&out.stdout).map_err(|e| format!("ffprobe: {e}"))?;
         let streams = v["streams"].as_array().cloned().unwrap_or_default();
         let vid = streams.iter().find(|s| s["codec_type"] == "video").ok_or("no video stream")?;
@@ -258,12 +245,7 @@ impl Probe {
             Some(length) => seconds(&vid["start_time"]).unwrap_or(origin) - origin + length,
             None => last_packet_end(video).map_or(duration, |end| end - origin),
         };
-        Ok(Probe {
-            w: vid["width"].as_f64().unwrap_or(1920.0),
-            h: vid["height"].as_f64().unwrap_or(1080.0),
-            duration,
-            picture,
-            audio: streams.iter().any(|s| s["codec_type"] == "audio"),
-        })
+        let audio = streams.iter().any(|s| s["codec_type"] == "audio");
+        Ok(Probe { w: vid["width"].as_f64().unwrap_or(1920.0), h: vid["height"].as_f64().unwrap_or(1080.0), duration, picture, audio })
     }
 }

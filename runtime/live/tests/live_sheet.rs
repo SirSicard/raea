@@ -5,7 +5,7 @@ use raea_runtime_react::scene::{LiveScene, Node3, Shot};
 
 fn plane(src: &str, grid: [u32; 2], frame: u32) -> Vec<Node3> {
     let props = serde_json::json!({"name": "film", "src": src, "width": 1, "grid": grid, "frame": frame});
-    vec![Node3 { kind: "ImagePlane".into(), props: std::sync::Arc::new(props.as_object().unwrap().clone()), shape: None, kids: Vec::new().into() }]
+    vec![Node3 { kind: "ImagePlane".into(), props: std::sync::Arc::new(props.as_object().unwrap().clone()), shape: None, at: None, kids: Vec::new().into() }]
 }
 
 /// Each frame sends the cell, and a swap to a sheet of another grid sends its src and grid, on the fast path as on the

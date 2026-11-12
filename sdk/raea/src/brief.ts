@@ -27,5 +27,7 @@ export const script = (s: Script): Script => s;
 export const taste = (t: Taste): Taste => t;
 /** An object's plan (plan.ts): its parts by name, levels, counts, materials. */
 export const plan = (p: Plan): Plan => p;
-/** A workspace's controller (controllers/<id>.ts): settings in groups of typed fields that every agent works to. */
+/** A workspace's controller (controllers/<id>.ts): settings in groups of typed fields that every agent works to.
+ *  A standing decision ("every ad is 9:16"), not one piece of work: that's a feed item, and a note on it. The raea app
+ *  shows a new controller in the project's feed, and an agent brings one to the person with `controller_post`. */
 export const controller = (c: ControllerInput): ControllerInput => c;

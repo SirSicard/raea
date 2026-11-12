@@ -161,25 +161,20 @@ pub(crate) fn read3d(world: &World, e: Entity, kept: &mut Kept3d, dirty: &bevy::
     let props = props3d(e, p.0.get("data-props").and_then(|v| v.as_str()));
     // a world's entities (<Entities>): its scene, already in world space, as meshes with their materials
     if &*kind == "Entities" {
-        let kids = props.get("scene").and_then(Value::as_array).into_iter().flatten().filter(|n| n["kind"] == "Mesh").map(|n| {
-            let mesh = n["mesh"].as_object().cloned().unwrap_or_default();
-            let mut p = Map::new();
-            p.insert("position".into(), n["position"].clone());
-            p.insert("rotation".into(), n["rotation"].clone());
-            p.insert("scale".into(), n["scale"].clone());
-            let mut mat = Map::new();
-            for k in ["color", "roughness", "metalness"] {
-                if let Some(x) = mesh.get(k) {
-                    mat.insert(k.into(), x.clone());
-                }
-            }
-            Node3 { kind: "Mesh".into(), props: std::sync::Arc::new(p), shape: mesh.get("shape").and_then(Value::as_str).map(Into::into), kids: std::sync::Arc::new([Node3 { kind: "MeshStandardMaterial".into(), props: std::sync::Arc::new(mat), shape: None, kids: Vec::new().into() }]) }
-        }).collect::<Vec<_>>();
-        return Some(Node3 { kind, props: std::sync::Arc::default(), shape: None, kids: kids.into() });
+        return Some(Node3 { kind, props: std::sync::Arc::default(), shape: None, at: None, kids: raea_core_scene::entities_nodes(&props).into() });
     }
     let mut kids = Vec::new();
     kids3d(world, e, kept, dirty, &mut kids);
-    Some(Node3 { kind, props, shape, kids: kids.into() })
+    Some(Node3 { kind, props, shape, at: at3d(e, p.0.get("data-at").and_then(|v| v.as_str())), kids: kids.into() })
+}
+
+/// A part's data-at, the same Arc while its text is the same: kept frames share one list (issue 84)
+fn at3d(e: Entity, text: Option<&str>) -> Option<std::sync::Arc<str>> {
+    let text = text?;
+    AT3D.with_borrow_mut(|c| match c.get(&e) {
+        Some(a) if &**a == text => Some(a.clone()),
+        _ => Some(c.entry(e).insert(text.into()).get().clone()),
+    })
 }
 
 /// The 3D children of `e` through plain elements between them (a Sequence's or a component's wrapper div), a kept

@@ -8,6 +8,11 @@
 #   git tag -a v0.1.0 -m "raea 0.1.0" -m "skills-passed: <full sha>"
 # A tag with a suffix (v0.1.0-rc1, v0.1.0-canary.3) is made a pre-release; a plain version (v0.1.0) is a full release,
 # GitHub's latest. The release's notes are set by hand.
+# A release whose code is a candidate's is promoted, not compiled again (tools/release/promoted-from.sh: the tag's
+# "promoted-from: v0.1.0-rc5" line, which tools/agents/release-go.sh writes): each job takes the candidate's attested
+# binaries for its platform (tools/release/promoted-bins.sh) and packs, checks, attests and attaches them as the
+# release, in minutes instead of the three hours a cold build takes. Run by hand, dry_run packs and checks without
+# attesting or attaching (the archives are the run's artifacts), for trying a promote before the real one.
 name: release
 
 on:
@@ -23,6 +28,14 @@ on:
         description: the full SHA where tools/skills.sh check passed with the feed app (else the tag's skills-passed line)
         default: ""
         type: string
+      promote_from:
+        description: a candidate tag (v0.1.0-rc5) whose binaries this release is, else the tag's promoted-from line; none builds from source
+        default: ""
+        type: string
+      dry_run:
+        description: pack and check only; nothing attested or attached (the archives are this run's artifacts)
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -56,6 +69,10 @@ jobs:
           ref: ${{ env.TAG }}
           submodules: true
           lfs: false
+      - name: Promoted from a candidate, or built (tools/release/promoted-from.sh)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/release/promoted-from.sh "$TAG" "${{ inputs.promote_from }}"
       - name: Linux libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build nasm libxkbcommon-dev libxkbcommon-x11-dev libasound2-dev libfontconfig1-dev libvulkan-dev libudev-dev mesa-vulkan-drivers xvfb
@@ -75,7 +92,20 @@ jobs:
             curl -fsSL "$url" -o "$HOME/.local/share/raea-models/$path"
             echo "$sha  $HOME/.local/share/raea-models/$path" | shasum -a 256 -c -
           done < tools/release/models.tsv
+      # rc3's build left 576 MB of macos-15's 320 GB free, and rc4's dSYMs (#88) ran it out linking raea-page-host
+      # (ld: write() failed, errno=28): the image's other Xcodes and the Android and .NET SDKs go first
+      - name: Room for the build
+        if: runner.os == 'macOS' && env.RAEA_PROMOTED_FROM == ''
+        run: |
+          df -h . | tail -1
+          keep=$(cd "$(xcode-select -p)/../.." && pwd -P)
+          for x in /Applications/Xcode*.app; do [ -L "$x" ] || [ "$(cd "$x" && pwd -P)" = "$keep" ] || sudo rm -rf "$x" & done
+          sudo rm -rf "$HOME/Library/Android" "$HOME/.dotnet" /usr/local/share/dotnet &
+          wait
+          echo "kept $keep"
+          df -h . | tail -1
       - name: Build
+        if: env.RAEA_PROMOTED_FROM == ''
         run: |
           feat=$(bash tools/bevy-plugins.sh features sdk/raea/bench/bevy-plugins)
           cargo build --profile dist --locked -p raea-cli --bin raea --no-default-features --features "$feat"
@@ -85,6 +115,13 @@ jobs:
           mkdir ship
           cp target/dist/raea target/dist/${{ matrix.lib }} target/dist/raea-rune-host target/dist/raea-page-host ship/
           if [ -n "${{ matrix.extra }}" ]; then cp target/dist/${{ matrix.extra }} ship/; fi
+          # the Mac's dSYMs (tools/link-jit.sh made them as it stripped each binary, #88); release.sh keeps them
+          if [ -d target/dist/symbols ]; then cp -R target/dist/symbols ship/; fi
+      - name: The candidate's binaries (tools/release/promoted-bins.sh)
+        if: env.RAEA_PROMOTED_FROM != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/release/promoted-bins.sh "$RAEA_PROMOTED_FROM" ship
       # the packing and its checks need only ship/, and macos-15's disk ran out packing rc1 with target/ kept
       - name: Free the build's disk
         run: |
@@ -110,15 +147,31 @@ jobs:
             ${{ runner.temp }}/release-check/**/*.log
           retention-days: 7
           if-no-files-found: ignore
+      # the stripped binaries' symbols (#88), for symbolicating a crash report from this release; never published
+      - uses: actions/upload-artifact@v4
+        with:
+          name: symbols-${{ runner.os }}
+          path: dist/raea-*-symbols
+          retention-days: 90
+          if-no-files-found: warn
       - uses: actions/attest-build-provenance@v2
+        if: ${{ !inputs.dry_run }}
         with:
           subject-path: dist/raea-*.tar.gz
       - name: Attach to the release
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" ${{ contains(env.TAG, '-') && '--prerelease' || '' }} --title "raea ${TAG#v}" --notes "Built by .github/workflows/release.yml; notes follow."
           gh release upload "$TAG" dist/raea-*.tar.gz dist/raea-*.tar.gz.sha256 --clobber
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.dry_run }}
+        with:
+          name: dry-run-${{ runner.os }}
+          path: dist/raea-*.tar.gz*
+          retention-days: 3
+          compression-level: 0
 
   # Windows in Git's bash on GitHub's runner, with the Visual Studio Build Tools in its image (their image terms; we
   # accept no licence and download no Microsoft files). The C runtime is the DLL one (the VC++ redistributable): ort's
@@ -135,7 +188,12 @@ jobs:
           ref: ${{ env.TAG }}
           submodules: true
           lfs: false
+      - name: Promoted from a candidate, or built (tools/release/promoted-from.sh)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/release/promoted-from.sh "$TAG" "${{ inputs.promote_from }}"
       - name: Toolchain (rust-toolchain.toml's pin)
+        if: env.RAEA_PROMOTED_FROM == ''
         run: rustup show active-toolchain || rustup toolchain install
       # jq for Windows ends -r lines with CRLF, so tools/bevy-plugins.sh read "ahoy\r" and lost its Bevy 0.20 block
       # (feature `ahoy` not found, 11-04); -b writes LF
@@ -162,12 +220,18 @@ jobs:
       # the app targets' hosts a cargo call each: with raea-cli's crates in one call taffy's features unify and
       # rune-taffy doesn't build; raea-perceive (`raea song`'s map, #43) a call of its own too
       - name: Build
+        if: env.RAEA_PROMOTED_FROM == ''
         run: |
           feat=$(bash tools/bevy-plugins.sh features sdk/raea/bench/bevy-plugins)
           cargo build --profile dist --locked -p raea-cli --bin raea --no-default-features --features "$feat"
           cargo build --profile dist --locked -p raea-rune-host
           cargo build --profile dist --locked -p raea-page-host --features window
           cargo build --profile dist --locked -p raea-perceive
+      - name: The candidate's binaries (tools/release/promoted-bins.sh)
+        if: env.RAEA_PROMOTED_FROM != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash tools/release/promoted-bins.sh "$RAEA_PROMOTED_FROM" target/dist
       # which DLLs raea needs from the machine (the CRT's come from the VC++ redistributable)
       - name: What raea.exe imports
         run: |
@@ -217,6 +281,7 @@ jobs:
           for n in $(sed -n 's/^\([^ ]*\) (.*): OPEN.*/\1/p' "$RUNNER_TEMP/play.txt"); do echo "--- $n"; { grep -v "known driver" "$out/$n.log" || echo "(its log is empty)"; } | tail -25; done
           exit $s
       - uses: actions/attest-build-provenance@v2
+        if: ${{ !inputs.dry_run }}
         with:
           subject-path: dist/raea-*.zip
       # kept even when its check fails, with the check's own files, so a failure can be looked into on a fresh runner
@@ -290,6 +355,7 @@ jobs:
           if ($LASTEXITCODE -or -not (Test-Path hello.png)) { throw "raea render failed" }
           Get-Item hello.png | Format-List Name, Length
       - name: Attach to the release
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -67,11 +67,12 @@ pub(crate) struct Sound {
 /// `render --manifest PATH` (the CLI's; render_bundle keeps its signature for the iPhone): where render.json goes.
 static MANIFEST: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
 
-/// The manifest, its folder made first (2D stills write it before their frames): boxes as drawn, findings, sounds.
-fn write_manifest(cx: &mut Ctx, (w, h, fps): (u32, u32, f64), found: Vec<raea_core_facts::Finding>, heard: impl FnOnce(&Ctx) -> Value) -> R<()> {
+/// The manifest, its folder made first (2D stills write it before their frames): the composition's length in frames
+/// (whatever was rendered of it; raea check --quick samples by it, #86), boxes as drawn, findings, sounds.
+fn write_manifest(cx: &mut Ctx, (w, h, fps, length): (u32, u32, f64, i64), found: Vec<raea_core_facts::Finding>, heard: impl FnOnce(&Ctx) -> Value) -> R<()> {
     let (Some(path), Some(frames)) = (MANIFEST.lock().unwrap().clone(), cx.manifest.take()) else { return Ok(()) };
     path.parent().map_or(Ok(()), std::fs::create_dir_all).map_err(|e| format!("{}: {e}", path.display()))?;
-    std::fs::write(&path, json!({"width": w, "height": h, "fps": fps, "frames": frames, "findings": raea_core_facts::finding::ranked(found), "sounds": heard(cx), "not_applied": not_applied::seen(), "layers": raea_sys_layers::finish(fps)}).to_string()).map_err(|e| format!("{}: {e}", path.display()))
+    std::fs::write(&path, json!({"width": w, "height": h, "fps": fps, "length": length, "frames": frames, "findings": raea_core_facts::finding::ranked(found), "sounds": heard(cx), "not_applied": not_applied::seen(), "layers": raea_sys_layers::finish(fps)}).to_string()).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// `render --stage WxH`: a responsive composition (one that lays out from useVideoConfig) laid out at a stage's size, as
@@ -209,6 +210,11 @@ fn heard(frames: &[(i64, Frame)], tones: &[raea_sys_mix::ToneCue], cx: &Ctx, fps
             let mut c = json!({"key": s.key, "from": f, "to": f + 1, "src": s.src, "at": (s.at * 1000.0).round() / 1000.0, "gainDb": ((20.0 * s.volume.max(1e-6).log10()) * 10.0).round() / 10.0});
             if let Some(b) = &s.bus {
                 c["bus"] = json!(b);
+            }
+            // its playback rate and fades, when it has them (the CapCut export's audio clips take them)
+            let extras = [("rate", Some(s.rate).filter(|r| *r != 1.0)), ("fadeIn", s.fade_in.filter(|v| *v > 0.0)), ("fadeOut", s.fade_out.filter(|v| *v > 0.0))];
+            for (k, v) in extras.into_iter().filter_map(|(k, v)| v.map(|v| (k, v))) {
+                c[k] = json!(v);
             }
             // a generated sound's key is model|prompt|seconds
             if let Some(k) = made.get(&s.src) {

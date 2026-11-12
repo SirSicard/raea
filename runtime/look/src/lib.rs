@@ -15,6 +15,8 @@ pub use post::*;
 mod parts;
 pub use parts::*;
 pub use instances::*;
+mod active;
+pub use active::*;
 
 /// Bloom of intensity 1: Bevy's natural preset.
 pub const BLOOM: f64 = 0.15;

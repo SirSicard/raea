@@ -257,14 +257,26 @@ impl Engine {
     /// With MotionBlur, the frame before the clock's drawn first (its readback ignored): Bevy takes each mesh's,
     /// skin's and the camera's previous pose from the update before, so this makes it frame f - 1's on every update of
     /// frame f, in a render (which may update a frame several times), a seek and play alike. It costs a second draw.
+    /// A cut to another camera (a timeline's Shots, or a live camera row's shot Moved since the frame drawn last) has
+    /// no frame before it, as a shot rendered alone hasn't: the step draws the frame itself, and Solari's history starts
+    /// again (RR2). It's taken with a plugin too, unlike the step to f - 1: every engine has one (the Engine's reads,
+    /// react_share), so the cut drew its blur from the frame drawn last, the other camera's.
     fn pre_step(&mut self) {
         let f = self.app.world().resource::<Clock>().0;
-        if !self.prestep || f <= 0 || plugins::active(self.app.world()) {
+        let moved = self.app.world_mut().remove_resource::<raea_sys_frame::shots::Moved>().is_some();
+        let cut = moved || self.app.world().get_resource::<raea_sys_frame::shots::Shots>().is_some_and(|s| s.starts(f));
+        #[cfg(feature = "raytracing")]
+        if cut {
+            raea_render_raytrace::cut(self.app.world_mut());
+        }
+        if !self.prestep || f <= 0 || (plugins::active(self.app.world()) && !cut) {
             return;
         }
         let world = self.app.world_mut();
-        world.resource_mut::<Clock>().0 = f - 1;
+        world.resource_mut::<Clock>().0 = if cut { f } else { f - 1 };
         world.resource_mut::<PreStep>().0 = true;
+        // armed, or a plugin's Time would move by the last update's step again
+        plugins::arm(self.app.world_mut());
         self.pipe.update(&mut self.app);
         let world = self.app.world_mut();
         world.resource_mut::<PreStep>().0 = false;
@@ -292,6 +304,10 @@ impl Engine {
         // a set that came, went or changed its kind (another shot's sky, AO coming on): the next frame warms up (draw)
         if self.app.world_mut().resource_mut::<FrameRows>().parse_looks() {
             self.warm_next = true;
+        }
+        // the camera row on another shot (its shot column sent only when it changes): the next frame drawn is a cut
+        if rows.iter().any(|t| t.kind == "camera" && t.vals.contains_key("shot")) {
+            self.app.world_mut().insert_resource(raea_sys_frame::shots::Moved);
         }
         // a glTF model, and a panorama a live frame showed first (#38), set up before the frame that shows it draws
         if spawned { scene3d::await_models(&mut self.app)?; }

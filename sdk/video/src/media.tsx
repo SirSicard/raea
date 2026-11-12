@@ -1,6 +1,6 @@
 // Video, Audio, Img and staticFile (spec: "Media plays in step with the frame"). These render as plain elements
 // that carry their props for the renderer, with the timing already worked out for the frame being rendered.
-import type { CSSProperties, ImgHTMLAttributes } from "react";
+import { createContext, useContext, type CSSProperties, type ImgHTMLAttributes } from "react";
 // assets stays in raea until it moves to @raea/asset (docs/sdk.feature S1d)
 import { isGeneratedAsset, type GeneratedAsset } from "@raea/asset/assets";
 import { useClockState, useLocalTime } from "@raea/app/clock";
@@ -11,13 +11,15 @@ export type VolumeProp = number | ((mediaFrame: number) => number);
 export interface MediaProps {
   /** the file: staticFile("clip.mp4"), or a generated asset */
   src: string;
-  /** the media's own frame it starts playing from (0); the same as trimBefore */
+  /** where in the media it starts playing (0), counted in the composition's frames, not the
+   * media's own: a 24 fps clip in a 60 fps film starts at its 4 s with startFrom={240}; the same as trimBefore */
   startFrom?: number;
-  /** the media's frame it stops before (exclusive): it holds the last frame, or loops; the same as trimAfter */
+  /** where in the media it stops (exclusive), in the composition's frames like startFrom: it holds the last frame, or
+   * loops; the same as trimAfter */
   endAt?: number;
-  /** frames of the media cut off its start (the newer name for startFrom) */
+  /** how much of the media is cut off its start, in the composition's frames (the newer name for startFrom) */
   trimBefore?: number;
-  /** the media's frame it's cut at (the newer name for endAt) */
+  /** where the media is cut, in the composition's frames (the newer name for endAt) */
   trimAfter?: number;
   /** linear gain, 1 being unity (0.5 is about -6 dB, 1.78 about +5 dB), or a function of the media's own frame */
   volume?: VolumeProp;
@@ -25,7 +27,8 @@ export interface MediaProps {
   gainDb?: VolumeProp;
   /** ours: seconds to ramp the sound in from silence at its start (applied by the renderer at the audio's rate) */
   fadeIn?: number;
-  /** ours: seconds to ramp the sound out to silence at its end */
+  /** ours: seconds to ramp the sound out to silence by its end: the end of its Sequence or Loop pass, or endAt, whichever
+   *  comes first (one removed some other way fades out after it's gone) */
   fadeOut?: number;
   /** how fast it plays (1): 2 is double speed */
   playbackRate?: number;
@@ -128,19 +131,39 @@ function fadeSeconds(owner: string, props: MediaProps, name: "fadeIn" | "fadeOut
   return v;
 }
 
+/** The composition frame after the last one media under it plays (a Sequence's end, a Loop pass's): its fadeOut ends
+ *  there, in the clip, not after it (timeline.tsx gives it; Infinity: none) */
+export const MediaEndContext = createContext(Infinity);
+
+/** `volume` turned down by the fade-out into `end` (a composition frame) at composition frame `now`. The mixer ramps
+ *  each frame's gain over the frame after it, so a frame says the gain one frame on, and its last frame is 1/(fade * fps):
+ *  a frame at 0 would drop the sound a frame early (a silent sound isn't played), and the stop at `end` takes it the rest
+ *  of the way in the mixer's 5 ms edge. */
+function fadedOut(volume: number, fade: number, fps: number, now: number, end: number): number {
+  if (!(fade > 0) || end === Infinity) return volume;
+  return volume * Math.min(1, Math.max(0, (end - now) / (fade * fps)));
+}
+
 // `src`: the file the element plays (an <Audio>'s generated sound passes its file; its props were copied to give it)
 function useMediaAttrs(owner: string, props: MediaProps, src = props.src as string) {
   const { fps } = useClockState(owner).config;
   const { frame, origin } = useLocalTime(owner);
   if (typeof src !== "string" || src === "") throw new Error(`${owner}: src is required`);
   const t = timing(owner, props, frame, src);
+  // where it stops: its Sequence's (or Loop pass's) end, or endAt reached (a loop never reaches it)
+  const endAt = props.loop ? undefined : (props.endAt ?? props.trimAfter);
+  const own = endAt === undefined ? Infinity : origin + Math.ceil((endAt - (props.startFrom ?? props.trimBefore ?? 0)) / (props.playbackRate ?? 1));
+  const fadeOut = fadeSeconds(owner, props, "fadeOut", src);
+  const end = Math.min(useContext(MediaEndContext), own);
+  const volume = fadedOut(t.volume, fadeOut, fps, origin + frame, end);
   const attrs: Record<string, string | number | undefined> = {
     src,
     "data-source-time": t.sourceFrame / fps,
     "data-source-frame": t.sourceFrame,
-    "data-volume": props.muted ? 0 : t.volume,
+    "data-volume": props.muted ? 0 : volume,
     "data-fade-in": fadeSeconds(owner, props, "fadeIn", src),
-    "data-fade-out": fadeSeconds(owner, props, "fadeOut", src),
+    // faded here into its end: the stop at the end is the mixer's edge. With no end, the mixer fades it once it's gone
+    "data-fade-out": end === Infinity ? fadeOut : 0,
     "data-playback-rate": props.playbackRate ?? 1,
     "data-start-from": props.startFrom ?? props.trimBefore ?? 0,
     "data-end-at": props.endAt ?? props.trimAfter,

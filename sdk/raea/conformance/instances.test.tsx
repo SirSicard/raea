@@ -11,6 +11,12 @@ const props = (h: string, kind: string) => {
   if (!m) throw new Error(`no ${kind} in ${h.slice(0, 300)}`);
   return JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
 };
+// the placements: their own attribute, not data-props, so the engine shares one list across frames (#84)
+const placed = (h: string, kind: string) => {
+  const m = h.match(new RegExp(`data-3d="${kind}"[^>]*data-at="([^"]*)"`));
+  if (!m) throw new Error(`no ${kind} data-at in ${h.slice(0, 300)}`);
+  return JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+};
 
 describe("Instances", () => {
   test("the mesh form: a Mesh node with its shape and the placements, 9 numbers a copy", () => {
@@ -18,13 +24,14 @@ describe("Instances", () => {
     const h = html(<Instances at={at} shadow={false}><Cuboid args={[1, 1, 1]} /><MeshStandardMaterial color="#336633" /></Instances>);
     expect(h).toContain('data-shape="');
     const p = props(h, "Mesh");
-    expect(p.at).toEqual([1, 0, 2, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1.5, 0, 2, 2, 2]);
+    expect(placed(h, "Mesh")).toEqual([1, 0, 2, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1.5, 0, 2, 2, 2]);
+    expect(p.at).toBeUndefined();
     expect(p.shadow).toBe(false);
   });
   test("the glTF form: a Model node", () => {
-    const p = props(html(<Instances src="daisy.glb" at={[{ position: [0, 0, 0] }]} />), "Model");
-    expect(p.src).toBe("daisy.glb");
-    expect(p.at).toHaveLength(9);
+    const h = html(<Instances src="daisy.glb" at={[{ position: [0, 0, 0] }]} />);
+    expect(props(h, "Model").src).toBe("daisy.glb");
+    expect(placed(h, "Model")).toHaveLength(9);
   });
   test("a buffer mesh is a shape", () => {
     const h = html(<Instances at={[{ position: [0, 0, 0] }]}><BufferMesh positions={[0, 0, 0, 1, 0, 0, 0, 1, 0]} /><MeshStandardMaterial /></Instances>);
@@ -32,8 +39,8 @@ describe("Instances", () => {
   });
   test("the same list is packed once", () => {
     const at = scatter({ area: { min: [0, 0], max: [4, 4] }, count: 50 });
-    const a = props(html(<Instances src="a.glb" at={at} />), "Model").at;
-    const b = props(html(<Instances src="a.glb" at={at} />), "Model").at;
+    const a = placed(html(<Instances src="a.glb" at={at} />), "Model");
+    const b = placed(html(<Instances src="a.glb" at={at} />), "Model");
     expect(a).toEqual(b);
   });
   test("errors say what's wrong", () => {

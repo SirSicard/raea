@@ -69,7 +69,7 @@ pub fn render(args: &[String]) -> R<String> {
     }
     let alpha = args.iter().any(|a| a == "--alpha");
     if alpha && !matches!(out_ext(&out).as_str(), "png" | "") {
-        return Err("--alpha writes PNGs (OUT.png or a folder): video here is H.264 or HEVC, which hold no alpha. Encode the folder with alpha after (ffmpeg -i DIR/frame-%05d.png -c:v prores_ks -profile:v 4444 -pix_fmt yuva444p10le overlay.mov)".into());
+        return Err(format!("--alpha writes PNGs (OUT.png or a folder) or a transparent movie (OUT.mov, --alpha-codec {}): an .{} holds no alpha", raea_io_alpha::NAMES, out_ext(&out)));
     }
     ALPHA.store(alpha, std::sync::atomic::Ordering::Relaxed);
     let kbps = flag(args, "--kbps").map(|k| k.parse::<u32>().ok().filter(|k| *k > 0).ok_or("--kbps takes a bitrate in kbit/s")).transpose()?;
@@ -134,9 +134,7 @@ pub fn render(args: &[String]) -> R<String> {
 /// measured by rendering them to a folder with --at), and the stats in the manifest with --manifest.
 fn with_exposure(said: String, out: &Path, manifest: Option<&Path>) -> String {
     let pngs: Vec<PathBuf> = if out.is_dir() {
-        let mut v: Vec<PathBuf> = std::fs::read_dir(out).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("frame-")) && p.extension().is_some_and(|x| x == "png")).collect();
-        v.sort();
-        v
+        raea_io_alpha::frames_in(out)
     } else if out.extension().is_some_and(|x| x == "png") {
         vec![out.to_path_buf()]
     } else {
@@ -302,7 +300,7 @@ pub(crate) fn render_bundle_with(js: &Path, dir: &Path, out: &Path, wanted: Opti
         }
         // with --manifest, its file as a 2D render writes it (it wrote none, and an older one stayed looking current, #28)
         let clipping = FED_CLIPPING.lock().unwrap().take().and_then(|t| t.join().ok()).unwrap_or_default();
-        write_manifest(&mut cx, (w, h, fps), clipping, |_| json!([]))?;
+        write_manifest(&mut cx, (w, h, fps, total), clipping, |_| json!([]))?;
         return Ok(if folder {
             format!("APPLIED  {} frames rendered to {} (bevy_ui, the page over its 3D)", wanted.len(), out.display())
         } else {
@@ -357,7 +355,7 @@ pub(crate) fn render_bundle_with(js: &Path, dir: &Path, out: &Path, wanted: Opti
     drop(app);
     // 3D parts passing through each other on screen: on stderr, and in the manifest for the legacy app's checks
     let clipping = scene::told(&frames, w, h, fps);
-    write_manifest(&mut cx, (w, h, fps), clipping, |cx| heard(&frames, &tones, cx, fps))?;
+    write_manifest(&mut cx, (w, h, fps, total), clipping, |cx| heard(&frames, &tones, cx, fps))?;
 
     let ext = out_ext(out);
     // raea-render's IR built directly from the frames and drawn by raea-render (checked equal to the retired rrl's compile of the same

@@ -228,6 +228,11 @@ export interface Camera3dProps {
   /** Bevy's Viewport: the camera draws into this region of the window only, `physical_position` from its top left and
    *  `physical_size` big (whole px, at a scale factor of 1) */
   viewport?: CameraViewport;
+  /** Bevy's Camera is_active: false and it draws nothing this frame, its lens and ambient with it. Several cameras in
+   *  the scene, one active a frame, cut between them inside one render: the frame another camera becomes active (the
+   *  first active one, in tree order, is the piece's) is a cut, drawn as a shot rendered alone draws its first frame
+   *  (no motion blur from the frame before). True by default */
+  is_active?: boolean;
   /** components on the camera: post effects, tone mapping, a skybox */
   children?: ReactNode;
 }
@@ -247,7 +252,7 @@ export type ClearColorConfig = "Default" | "None" | { Custom: Srgba | LinearRgba
  * @bevy bevy_camera::components::Camera3d
  * @bevy bevy_camera::camera::Camera
  * @bevy bevy_camera::projection::Projection */
-export function Camera3d({ transform, projection = { Perspective: {} }, layers, order, clear_color, viewport, children: kids }: Camera3dProps) {
+export function Camera3d({ transform, projection = { Perspective: {} }, layers, order, clear_color, viewport, is_active, children: kids }: Camera3dProps) {
   if (order !== undefined && !Number.isInteger(order)) throw new TypeError(`Camera3d: order is a whole number, got ${order}`);
   const clear = clearOf(clear_color);
   if (viewport !== undefined) {
@@ -284,10 +289,13 @@ export function Camera3d({ transform, projection = { Perspective: {} }, layers, 
   // its rotation as its Transform holds it, which the engine places it by (rolled or not), exactly; the look-at point
   // is for what reads a camera by where it looks (its lens's focus, picking, sound)
   const look = { position: eye, lookAt, rotation: q, ...(layers ? { layers } : {}), ...(order ? { order } : {}), ...clear, ...(viewport ? { viewport } : {}) };
+  // not drawing this frame: the camera alone, marked, so the scene knows which of its cameras is (a cut, RR2)
+  const off = is_active === false;
   if ("Orthographic" in projection) {
     const o = projection.Orthographic;
     const height = o.scaling_mode?.FixedVertical.viewport_height;
     if (dof) throw new TypeError("Camera3d: DepthOfField needs a Perspective projection");
+    if (off) return <OrthographicCamera {...look} near={o.near} far={o.far} height={height} active={false} />;
     return (
       <>
         <OrthographicCamera {...look} near={o.near} far={o.far} height={height}>{children}</OrthographicCamera>
@@ -296,6 +304,7 @@ export function Camera3d({ transform, projection = { Perspective: {} }, layers, 
     );
   }
   const p = projection.Perspective;
+  if (off) return <PerspectiveCamera {...look} fov={((p.fov ?? Math.PI / 4) * 180) / Math.PI} near={p.near} far={p.far} active={false} />;
   return (
     <>
       <PerspectiveCamera {...look} fov={((p.fov ?? Math.PI / 4) * 180) / Math.PI} near={p.near} far={p.far} {...focus}>{children}</PerspectiveCamera>

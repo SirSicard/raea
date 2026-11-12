@@ -315,7 +315,9 @@ impl log::Log for Logger {
         // acts on: the `log` crate is third-party crates' (Bevy's Ctrl+C handler at info, fontdb's skipped faces: a
         // system font it can't parse, or a missing @font-face file raea_sys_page_net already names), which printed
         // on every render and buried what mattered (#34)
-        if r.level() <= log::Level::Warn && !r.target().starts_with("fontdb") {
+        // bevy_time's "did not receive the time from the render world" too: raea drives Time by frame with the render
+        // world in step, so it says nothing a reader acts on
+        if r.level() <= log::Level::Warn && !r.target().starts_with("fontdb") && !r.target().starts_with("bevy_time") {
             eprintln!("[{} {}] {}", r.level(), r.target(), r.args());
         }
         event("log", json!({"level": r.level().as_str(), "target": r.target(), "message": r.args().to_string()}));

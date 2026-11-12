@@ -33,6 +33,13 @@ fn log(a: &[String]) -> Result<Ret, String> {
     Ok(Ret::Undefined)
 }
 
+/// Every native call a composition's thread answers; `raea types` types this same list (sdk/raea/src/native-calls.ts).
+pub fn register_natives() {
+    raea_native::register("page.viewBox", "{}", "[number, number, number, number] | null", "the box (x, y, w, h in frame px) a camera in a page element draws its view in, as last laid out; null when it draws under the whole frame (3D picking in the box, docs/sdk.feature S3a)", |_| Ok(serde_json::json!(*VIEW_BOX.lock().unwrap())));
+    // the calls crate's, matchmove.solve (scene/track.rs), physics.* (systems/bake), scene.* (scene/contact.rs), *.shot (runtime/shots)
+    [native::register, scene::track::register, scene::physics::register, raea_runtime_shots::register, scene::register_scene].iter().for_each(|r| r());
+}
+
 /// The JS thread: the prelude, the shims, the bundle, then timers and Bevy's events. Both engines run promise jobs as
 /// each call returns, so there are no microtask checkpoints to make.
 pub(crate) fn js_thread(bundle: PathBuf, tx: Sender<Batch>, events: Receiver<String>) {
@@ -60,12 +67,7 @@ pub(crate) fn js_thread(bundle: PathBuf, tx: Sender<Batch>, events: Receiver<Str
             return;
         }
     }
-    native::register();
-    raea_native::register("page.viewBox", "{}", "[number, number, number, number] | null", "the box (x, y, w, h in frame px) a camera in a page element draws its view in, as last laid out; null when it draws under the whole frame (3D picking in the box, docs/sdk.feature S3a)", |_| Ok(serde_json::json!(*VIEW_BOX.lock().unwrap())));
-    // matchmove.solve (scene/track.rs), physics.* for <Physics> and <Goo> (systems/bake), scene.bounds and facing (scene/contact.rs)
-    for register in [scene::track::register, scene::physics::register, scene::register_scene] {
-        register();
-    }
+    register_natives();
     for (src, name) in [(PRELUDE, "prelude.js")] {
         if let Err(e) = ctx.eval(src, name) {
             error!("raea-runtime-react: {name}: {e}");

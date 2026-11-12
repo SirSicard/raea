@@ -127,6 +127,7 @@ impl Engine {
         };
         world.insert_resource(Edit { prog: prog.clone(), timeline, media });
         world.insert_resource(raea_sys_frame::tables::Cuts::of(prog));
+        world.insert_resource(raea_sys_frame::shots::Shots::of(prog));
         world.insert_resource(FrameRows::new(ix));
         let Some(cam) = camera else { return Err("the edit needs a camera: INSERT INTO camera (id, ...) VALUES (...)".into()) };
         let models = world.query::<&scene3d::Model3d>().iter(world).count();

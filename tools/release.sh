@@ -6,7 +6,8 @@
 # out as the installer puts it under ~/.raea. Built from the committed tree at REF (never anyone's unfinished edit);
 # the runtime's packages (sdk/react/js/node_modules, installed, not committed) come from this checkout.
 #
-#   tools/release.sh VERSION BIN_DIR [REF]     BIN_DIR holds a release build's raea and its bundler
+#   tools/release.sh VERSION BIN_DIR [REF]     BIN_DIR holds a release build's raea and its bundler, or a candidate's,
+#                                              unpacked from its archive (a promoted release, tools/release/promoted-from.sh)
 #                                              (libraea_bundle.dylib, .so, or raea.exe and raea_bundle.dll),
 #                                              raea-perceive (`raea song` runs it; off Apple since #43), and the app
 #                                              targets' two
@@ -106,9 +107,23 @@ since=${RAEA_SINCE:-$(git describe --tags --abbrev=0 --match 'v*' "$ref" 2>/dev/
 case $platform in
   linux-x86_64)
     cp "$bin/raea" "$bin/libraea_bundle.so" "$bin/raea-perceive" "$bin/raea-rune-host" "$bin/raea-page-host" "$stage/bin/"
+    # each loses its debug info and local symbols (#88: rc2's raea was 2.67 GB, 491 MB stripped), kept in
+    # dist/NAME-symbols/FILE.debug, which the stripped file names (gdb and addr2line find it); never shipped
+    mkdir -p "$out/$name-symbols"
+    for f in "$stage"/bin/*; do
+      n=$(basename "$f"); d="$out/$name-symbols/$n.debug"
+      # already stripped, with its debuglink: a promoted release's binary, packed once as its candidate
+      # (tools/release/promoted-bins.sh), whose symbols come with it in BIN_DIR/symbols; the link names the same file
+      if readelf -S "$f" 2>/dev/null | grep -q '\.gnu_debuglink'; then
+        if [ -f "$bin/symbols/$n.debug" ]; then cp "$bin/symbols/$n.debug" "$d"; else echo "release.sh: note: $n came stripped, without its symbols" >&2; fi
+        continue
+      fi
+      objcopy --only-keep-debug "$f" "$d" && strip --strip-debug --discard-all "$f" && objcopy --add-gnu-debuglink="$d" "$f"
+    done
     # what a Linux machine needs beside it: the bundled Noto Sans JP is a Latin subset, so kanji and kana come from the
     # system, as on a Mac (raea warns once a character when no font has it)
     printf '%s\n' "raea $version for Linux x86_64 (glibc 2.39 or newer, Vulkan: a GPU driver or Mesa's llvmpipe).
+raea links ALSA and fontconfig (Ubuntu 24.04 and Debian: apt install libasound2t64 libfontconfig1; libasound2 before 24.04).
 Install a CJK font for Japanese, Chinese and Korean text (Debian and Ubuntu: apt install fonts-noto-cjk).
 An app's window, on either target (raea app run, raea-rune-host and raea-page-host), needs a display (X11 or
 Wayland; Xvfb on a server, as raea app check does there too), libxkbcommon-x11, the X client libraries and the Vulkan
@@ -120,7 +135,13 @@ loader (Debian and Ubuntu: apt install libxkbcommon-x11-0 libxcursor1 libxi6 lib
     printf '%s\r\n' "raea $version for Windows x86_64 (Windows 10 or 11, a DirectX 12 or Vulkan GPU driver; with no GPU, Mesa's lavapipe and WGPU_BACKEND=vulkan)." \
       "It needs the Microsoft Visual C++ Redistributable (x64), which most machines already have:" \
       "https://aka.ms/vs/17/release/vc_redist.x64.exe" > "$stage/README.txt" ;;
-  *) cp "$bin/raea" "$bin/libraea_bundle.dylib" "$bin/raea-perceive" "$bin/raea-rune-host" "$bin/raea-page-host" "$stage/bin/" ;;
+  *) cp "$bin/raea" "$bin/libraea_bundle.dylib" "$bin/raea-perceive" "$bin/raea-rune-host" "$bin/raea-page-host" "$stage/bin/"
+    # stripped as they linked (tools/link-jit.sh, #88); a binary that still holds its debug map is a build from before
+    for f in raea raea-page-host raea-rune-host raea-perceive; do
+      [ "$(nm -a "$stage/bin/$f" 2>/dev/null | awk '$2 == "-"' | head -2 | wc -l)" -lt 2 ] || echo "release.sh: $f isn't stripped (a dist build strips it as it links; RAEA_KEEP_SYMBOLS=1 keeps them)" >&2
+    done
+    # their dSYMs, which link-jit.sh made, kept beside the archive (never shipped)
+    if [ -d "$bin/symbols" ]; then mkdir -p "$out/$name-symbols" && cp -R "$bin/symbols/." "$out/$name-symbols/"; fi ;;
 esac
 # the packages sdk/tsconfig.base.json lists (@raea/<name>: its sources and package.json), which the bundlers resolve by it
 pkgs=()
@@ -130,6 +151,8 @@ for p in $(git show "$ref:sdk/tsconfig.base.json" | jq -r '.compilerOptions.path
   pkgs+=("sdk/$p/src" "sdk/$p/package.json")
   git cat-file -e "$ref:sdk/$p/bevy" 2>/dev/null && pkgs+=("sdk/$p/bevy")
   git cat-file -e "$ref:sdk/$p/examples" 2>/dev/null && pkgs+=("sdk/$p/examples")
+  # and its python/ (@raea/blender's bridge, which runs inside Blender: `raea blender run SCRIPT.ts` starts it)
+  git cat-file -e "$ref:sdk/$p/python" 2>/dev/null && pkgs+=("sdk/$p/python")
 done
 [ ${#pkgs[@]} -gt 0 ] || { echo "release: no @raea packages in sdk/tsconfig.base.json at $ref" >&2; exit 1; }
 # the committed files raea reads at run time

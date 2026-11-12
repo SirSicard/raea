@@ -85,6 +85,9 @@ fn pass_rows(world: &mut World, inserted: &[Tup]) -> Result<(), String> {
         if let Some(w) = pass.written.as_mut() {
             w.id = t.id.clone();
         }
+        if let Some(i) = pass.inline.as_mut() {
+            i.id = t.id.clone();
+        }
         passes.push(pass);
     }
     let cams: Vec<Entity> = world.query_filtered::<(Entity, &Camera), (With<Camera3d>, Without<BareEntity>)>().iter(world).filter(|(_, c)| c.order == 0).map(|(e, _)| e).collect();

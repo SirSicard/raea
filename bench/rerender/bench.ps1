@@ -21,7 +21,7 @@ $ErrorActionPreference = "Continue"
 if (-not $Film) { $Film = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "film.tsx" }
 if (-not (Test-Path $Raea)) { Write-Output "bench: no raea at $Raea"; exit 2 }
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
-$env:RAEA_SIGN = "0"; $env:RAEA_MARK = "0"; $env:RAEA_EXPORT_CACHE = "0"; $env:RAEA_TIMES = "1"
+$env:RAEA_SIGN = "0"; $env:RAEA_MARK = "0"; $env:RAEA_EXPORT_CACHE = "0"; $env:RAEA_TIMES = "1"; $env:RAEA_RENDER_STATS = "1"
 function Now { [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0 }
 $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
 

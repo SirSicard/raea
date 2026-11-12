@@ -121,7 +121,7 @@ fn rewrite_node(url: &str, js: &str) -> String {
         if SOURCES.with(|s| s.borrow().contains_key(&u)) {
             return Some(u);
         }
-        match crate::node::load(&path) {
+        match crate::node::load(&path, false) {
             Ok(src) => {
                 SOURCES.with(|s| s.borrow_mut().insert(u.clone(), src));
                 Some(u)
@@ -208,7 +208,7 @@ fn run_here(root: &Path, cwd: &Path, entry: Entry, argv: Vec<String>, env: serde
     // the entry module
     let (url, js) = match &entry {
         // import.meta.main (Bun's and Node 24's): true in the entry, false in the modules it imports (node.rs)
-        Entry::File(p) if node => crate::node::load_entry(p).map(|src| (format!("file://{}", p.display()), src)),
+        Entry::File(p) if node => crate::node::load(p, true).map(|src| (format!("file://{}", p.display()), src)),
         Entry::File(p) => LOADER.with(|l| {
             let mut l = l.borrow_mut();
             let l = l.as_mut().unwrap();

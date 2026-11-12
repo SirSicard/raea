@@ -1,7 +1,7 @@
 ---
 title: "raea bundle"
 summary: "Bundle a composition into one JavaScript file that render_bundle draws, on the Mac or the iPhone."
-order: 5
+order: 6
 sources: ["engine/cli/src/cli.rs", "runtime/bundle/src/lib.rs"]
 ---
 

@@ -35,6 +35,7 @@ Render, play and package what you wrote.
 | [`raea render`](render.md) | Render a composition to an MP4, a PNG or a folder of frames, on the GPU and headless. |
 | [`raea play`](play.md) | Play a game live in a window, or headless with scripted keys, snapshots and a timing report. |
 | [`raea export-game`](export-game.md) | Package a game as a program of its own: a Mac app or a command-line program. |
+| [`raea export`](export.md) | The composition as a CapCut draft ready in its timeline: its footage and sounds as clips of their own files at their trims and gains, everything raea draws as transparent overlay clips above them. |
 | [`raea bundle`](bundle.md) | Bundle a composition into one JavaScript file that render_bundle draws, on the Mac or the iPhone. |
 | [`raea app`](app.md) | Run, check headless and package a desktop app written as one TSX file on @raea/ui. |
 | [`raea run`](run.md) | Run a TypeScript program on the engine, headless, and print what it prints. |
@@ -100,13 +101,14 @@ Music read, foley and instruments made on this machine.
 
 ## Generate and 3D tools
 
-Generated media, physics bakes and Blender.
+Generated media, physics bakes, Blender and Godot.
 
 | Verb | What it does |
 | --- | --- |
 | [`raea gen`](gen.md) | Generate images, video, music, sound, speech, 3D models and text through made.app, fal, Replicate, OpenRouter, Modal or ComfyUI. |
 | [`raea physics`](physics.md) | Make the bakes <Physics> and <Goo> play: rigid bodies, soft goo, and parts cut out of a .glb. |
 | [`raea blender`](blender.md) | Run a Blender Python script headless, with raea's library of mesh scripts: convert, decimate, repair, split, bake, rig, cloth. |
+| [`raea godot`](godot.md) | Run a TypeScript script against Godot's whole API in a headless Godot with GodotJS, record what it draws as frames, or open the editor on the project. |
 
 ## Agents and setup
 
@@ -120,6 +122,6 @@ What an agent reads and shows the person, and the tools raea installs.
 | [`raea show`](show.md) | Show the person something in the raea app, as an item they can use and answer: stills, a video, a sound, a script, an interactive .tsx or a question. |
 | [`raea skill`](skill.md) | Print the agent skill this raea ships, matched to its version, or one of its references. |
 | [`raea skills`](skills.md) | Install raea's agent skill where Claude Code, Codex, Kimi or Gemini read skills, with its MCP server and hook. |
-| [`raea setup`](setup.md) | Find Blender, or download its current LTS, and install its MCP add-on. |
+| [`raea setup`](setup.md) | Find Blender, or download its current LTS, and install raea's add-on and the MCP add-on. |
 
 <!-- generated:end -->

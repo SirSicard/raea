@@ -308,7 +308,7 @@ pub(crate) fn render_fed(app: &mut App, js: &Path, w: u32, h: u32, fps: f64, tot
     // 3D parts passing through each other on screen: on stderr, and in the manifest for the legacy app's checks
     let found = FED_CLIPPING.lock().unwrap().take().and_then(|t| t.join().ok());
     let clipping = found.unwrap_or_else(|| scene::told(&frames.borrow(), w, h, fps));
-    write_manifest(cx, (w, h, fps), clipping, |cx| heard(&frames.borrow(), &notes.borrow(), cx, fps))?;
+    write_manifest(cx, (w, h, fps, total), clipping, |cx| heard(&frames.borrow(), &notes.borrow(), cx, fps))?;
     let ms = t0.elapsed().as_secs_f64() * 1e3 / n.max(1) as f64;
     Ok(format!("APPLIED  {n} frames rendered to {} ({ms:.1} ms a frame, pages handed to raea-render on the GPU)", out.display()))
 }

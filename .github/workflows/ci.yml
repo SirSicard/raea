@@ -113,4 +113,7 @@ jobs:
       - name: cargo check
         run: cargo check --locked -p raea-cli --tests
       - name: unit tests (the crates with no GPU or media device)
-        run: cargo test --locked -p raea-io-media -p raea-core-fonts -p raea-native
+        # debug info off: with it the test binaries of the app crates filled 27 GB of a runner's disk (#90)
+        env:
+          CARGO_PROFILE_TEST_DEBUG: "0"
+        run: cargo test --locked -p raea-io-media -p raea-core-fonts -p raea-native -p raea-core-brief -p raea-core-k -p raea-bundle -p raea-app-check -p raea-app-check-flash -p raea-app-workspace -p raea-app-tools -p raea-app-targets

@@ -14,6 +14,7 @@ raea render piece.tsx -o piece.mp4                       # the whole video
 raea render piece.tsx --frame 120 -o frame-120.png       # one frame
 raea render piece.tsx --at 15,63,144 -o stills/          # some frames, in order: stills/frame-00000.png is frame 15
 raea render piece.tsx --alpha -o frames/                 # every frame as a transparent PNG
+raea render piece.tsx --alpha -o overlay.mov             # a transparent movie (ProRes 4444 on a Mac)
 raea render piece.tsx --quality master -o final.mp4      # constant quality for type and thin lines
 raea render scene.tsx --review review/                   # a 3D scene from six fixed cameras, in colour and clay
 raea render piece.tsx -o piece.wav                       # the sound alone, no frames drawn
@@ -52,7 +53,7 @@ the reason in the manifest. A render of a file in a raea project also keeps its 
 ## Usage
 
 ```sh
-raea render EDIT.tsx -o OUT.mp4|OUT.png|OUT.wav|DIR [--audio OUT.wav] [--frame N | --at A,B] [--composition ID] [--w W] [--h H] [--fps FPS] [--frames N] [--words W.json] [--perception P.json] [--input I.json|inputs.rrl] [--manifest render.json] [--layers] [--stage WxH] [--10bit] [--aov] [--alpha] [--kbps N | --quality draft|high|master|0..1] [--clay] [--despite CHECK WHY]   (also: --lite --comps)
+raea render EDIT.tsx -o OUT.mp4|OUT.png|OUT.wav|DIR [--audio OUT.wav] [--frame N | --at A,B] [--composition ID] [--w W] [--h H] [--fps FPS] [--frames N] [--words W.json] [--perception P.json] [--input I.json|inputs.rrl] [--manifest render.json] [--layers] [--stage WxH] [--10bit] [--aov] [--alpha [--alpha-codec prores|hevc|rle|png]] [--kbps N | --quality draft|high|master|0..1] [--clay] [--despite CHECK WHY]   (also: --lite --comps)
 raea render EDIT.tsx --review DIR [--frame N]   (fixed cameras hero, front, right, top, iso, low in colour and clay: DIR/colour.png, clay.png, review.json)
 raea render PAGE.html -o OUT.mp4|OUT.png|DIR [--at A,B] [--alpha]   (an HTML composition)
 raea render --bundle NAME.comp.js -o OUT.png|DIR [--dir DIR] [--frame N]   (a bundle from raea bundle, as render_bundle draws it)
@@ -65,7 +66,8 @@ Headless: it needs nothing running and opens no window. Takes up to 1 argument b
 | Flag | Takes | What it does |
 | --- | --- | --- |
 | `--10bit` | – | Encode the video as 10-bit HEVC (Main 10), whose decoded colours match the render exactly; H.264 8-bit otherwise. |
-| `--alpha` | – | Keep the background transparent. Writes PNGs only (`-o OUT.png` or a folder): H.264 and HEVC hold no alpha, so encode the folder to ProRes 4444 afterwards if you need a video. |
+| `--alpha` | – | Keep the background transparent: PNGs (`-o OUT.png` or a folder) or a transparent movie (`-o OUT.mov`, see `--alpha-codec`). An `.mp4` holds no alpha. |
+| `--alpha-codec` | `prores\|hevc\|rle\|png` | With `--alpha` and `-o OUT.mov`: ProRes 4444 (the default on a Mac) or HEVC with alpha, both through VideoToolbox on a Mac; QuickTime Animation (lossless, the default elsewhere) or PNG frames, on every platform. Editors that take overlays (Final Cut, Premiere, DaVinci Resolve, CapCut) read all four, HEVC in the newest versions. |
 | `--aov` | – | Write each frame's motion vectors and depth beside its colour, in `DIR/motion` and `DIR/depth`, for [`raea neural`](neural.md). `-o` must name a folder. |
 | `--at` | `A,B` | Render only these frame numbers, comma-separated. |
 | `--audio` | `OUT.wav` | With a video `-o`: also write its sound to `OUT.wav`, the same mastered sound the video carries (before AAC), from the same pass. |
@@ -83,7 +85,7 @@ Headless: it needs nothing running and opens no window. Takes up to 1 argument b
 | `--kbps` | `N` | A fixed video bitrate in kbit/s, in place of the default that follows size and frame rate. |
 | `--layers` | – | Write `NAME.layers` beside the export: which layer (a 3D part, an element, its text, an image or a video, by where its JSX is written) each pixel of each frame shows, for raea's player to select layers by clicking. The manifest (`--manifest`, or `NAME.render.json` beside it) names it. The export cache is skipped. |
 | `--lite` | – | Draw with raea's live view runtime instead of React, as a live game does. Used by the app when it opens a game. |
-| `--manifest` | `render.json` | Write the render's manifest to this file instead of beside the output: every frame's element boxes as drawn, what the render found and the sounds heard, which `raea check` and `raea world` read. |
+| `--manifest` | `render.json` | Write the render's manifest to this file instead of beside the output: the composition's length in frames (`length`, whichever frames were rendered), every frame's element boxes as drawn, what the render found and the sounds heard, which `raea check` and `raea world` read. |
 | `--perception` | `P.json` | The perception the composition's Clock reads (faces, boxes, one for every frame or by frame), when it isn't the `perception.json` beside it. |
 | `--quality` | `draft\|high\|master\|0..1` | Constant-quality encoding: `draft` for previews, `high` for most deliveries, `master` for type and hard edges, or a number from 0 to 1. On Windows and Linux (OpenH264) it scales the bitrate instead, and once a frame fits at OpenH264's finest quantiser (12), a higher setting writes the same file. |
 | `--review` | `DIR` | Render a 3D scene from six fixed cameras (hero, front, right, top, iso, low), in colour and in clay, to `DIR/colour.png`, `DIR/clay.png` and `DIR/review.json`. |

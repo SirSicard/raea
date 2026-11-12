@@ -26,8 +26,10 @@ its hands, feet, gaze and seat on the scene's real things, said in the scene's c
   hull unless `outline` asks for one. Each echo is its own Character of the same body with its own `name` (`kid-echo1`,
   ...) posed at an earlier frame.
 - A held pose is bones aimed in the body's frame (x its left, y up, z ahead):
-  `held(kid, { RightArm: [-0.3, 0.9, 0.2], RightForeArm: [-0.1, 1, 0.3] })`. Joints carry CMU's names (Hips, Spine1,
-  Neck1, Head, LeftArm, LeftForeArm, LeftHand, LeftUpLeg, LeftLeg, LeftFoot, ...).
+  `held(kid, { upperarm_r: [-0.3, 0.9, 0.2], lowerarm_r: [-0.1, 1, 0.3] })`. Joints carry MakeHuman's game_engine
+  names, which `B` in `raea/character` holds (`B.upperarm("R")`): pelvis, spine_01 to spine_03, neck_01, head,
+  clavicle_l, upperarm_l, lowerarm_l, hand_l, thigh_l, calf_l, foot_l, ball_l, the fingers' thumb_01_l to pinky_03_l,
+  and each with `_r`.
 - Goals, in the scene's coordinates:
   - `hands: { R: { at: MOUSE, point: [0, 0, -1] } }` rests the right palm on the mouse, flat, fingers pointing that way.
     Leave out `point` to bring the hand there as the pose holds it.
@@ -94,13 +96,11 @@ const ph = perf.phase(frame), on = ph?.stage === "sat" ? Math.min(1, ph.since / 
 
 ## Why
 
-The skeleton is CMU's own: 31 joints, each joint's rest frame the world's, standing in CMU's T-pose, so a clip's
-turns play nearly as recorded. Its limbs are laid along the capture's bones, but its back, neck and head keep
-Anny's build and take the capture's turns from rest (CMU's are a straight stick leaning back, and laid along it the
-neck tipped back and the chin sank into the throat), and the neck and head move about the clip's own average, so the
-body carries its head as Anny does. The skin is not bound to those 31: Anny's cmu_mb weights square the shoulders off as
-the arms come down (her own forward pass does the same), so the skin carries Anny's default rig's weights, with its
-shoulder helper and twist bones, on 44 joints `skinJoints` works out from the 31 each frame, bound in Anny's own rest. So a clip retargets joint by joint, and the
+The skeleton is MakeHuman's game_engine rig, raea's one character skeleton (an Anny body's and a psx person's
+alike): 22 joints for the body and 30 for the fingers, each joint's rest frame the world's, standing in the body's own
+A-pose. The skin is bound to those same joints with MakeHuman's own weights, so body.glb's bones are the skeleton's
+joints by name and a pose turns them directly. A capture's own joint names are read once, through its map
+(sdk/raea/tools/maps), when its clips are retargeted onto the body. So a clip retargets joint by joint, and the
 goals are analytic: two-bone IK, soft over the last 3% of reach so pinned feet don't snap the knees. A performance is
 simulated once from frame 0 for its spec, and each frame reads its pose, so a render and a live play agree. The feet
 are pinned to the floor while they stand, and switches between clips are blended out over a fifth of a second.

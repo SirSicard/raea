@@ -28,7 +28,7 @@ FILM=$ROOT/bench/rerender/film.tsx
 command -v jq > /dev/null || { echo "bench: needs jq"; exit 2; }
 mkdir -p "$OUT"
 # pixels and timing only: no Content Credentials, no watermark, no export cache (a hit would time nothing)
-export RAEA_SIGN=0 RAEA_MARK=0 RAEA_EXPORT_CACHE=0 RAEA_TIMES=1
+export RAEA_SIGN=0 RAEA_MARK=0 RAEA_EXPORT_CACHE=0 RAEA_TIMES=1 RAEA_RENDER_STATS=1
 export BIN FILM OUT
 
 now() { perl -MTime::HiRes=time -e 'printf "%.3f", time'; }

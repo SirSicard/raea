@@ -56,6 +56,7 @@ raea-app-notes = { path = "../../apps/notes" }
 raea-app-sound = { path = "../../apps/sound" }
 raea-app-ci = { path = "../../apps/ci" }
 raea-app-tools = { path = "../../apps/tools" }
+raea-app-engines = { path = "../../apps/engines" }
 # raea solid info|view: a solid file measured and pictured
 raea-app-solid = { path = "../../apps/solid" }
 # raea judge: review sheets judged by clef-omni
@@ -64,6 +65,7 @@ raea-app-media = { path = "../../apps/media" }
 # `raea app run|check|bundle` and `raea rune` on either target (docs/targets.feature T0b)
 raea-app-targets = { path = "../../apps/targets" }
 raea-app-game = { path = "../../apps/game" }
+raea-app-capcut = { path = "../../apps/capcut" }
 raea-app-play = { path = "../../apps/play", features = ["ml"] }
 raea-bevy-plugins = { path = "../../engine/bevy-plugins", optional = true }
 # raea-bevy-sdk's reflection of the plugin build's App: the type registry, a one-camera program, the animation type

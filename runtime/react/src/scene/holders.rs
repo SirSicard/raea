@@ -7,6 +7,7 @@ pub fn scene_of(world: &mut World) -> Vec<Node3> {
     let now = SCENE3D.with(|g| { g.set(g.get() + 1); g.get() });
     if now % 120 == 0 {
         PROPS3D.with(|c| c.borrow_mut().retain(|_, v| v.2 + 2 >= now));
+        AT3D.with_borrow_mut(|a| PROPS3D.with_borrow(|p| a.retain(|e, _| p.contains_key(e))));
         if world.contains_resource::<Kept3d>() {
             world.resource_scope(|w, mut k: Mut<Kept3d>| k.of.retain(|e, _| w.get_entity(*e).is_ok()));
         }

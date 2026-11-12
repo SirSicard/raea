@@ -31,6 +31,8 @@ mod state;
 pub use state::*;
 /// a row's per-frame tables (a frame's look, the camera's post-processing), laid onto it frame by frame
 pub mod tables;
+/// the frames where another camera becomes the piece's (a cut between cameras, RR2)
+pub mod shots;
 
 /// A model row's entity (a glTF under it), whatever its loading stage.
 #[derive(Component, Default)]

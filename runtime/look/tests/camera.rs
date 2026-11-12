@@ -11,7 +11,7 @@ use raea_runtime_look::camera;
 use serde_json::json;
 
 fn cam(props: serde_json::Value) -> Item {
-    Item { kind: "camera", props: Arc::new(props.as_object().unwrap().clone()), shape: None, material: None, world: Mat4::IDENTITY }
+    Item { kind: "camera", props: Arc::new(props.as_object().unwrap().clone()), shape: None, material: None, at: None, world: Mat4::IDENTITY }
 }
 
 #[test]

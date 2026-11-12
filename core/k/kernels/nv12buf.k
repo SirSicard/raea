@@ -1,6 +1,10 @@
 / RGBA (buffer F, w x h words; the frame tag is texel (8, h) of texture T; w x h, plus a frame-tag texel at (8, h)) to NV12, BT.709 limited range in 8.8 fixed point.
 / One output word per thread: four luma bytes, or two interleaved chroma pairs (each the mean of a 2x2 block),
 / or, last, the tag texel. Coordinates are clamped so the branch not taken stays in bounds.
+/ Each sample is rounded through a 4x4 Bayer threshold of its pixel (a chroma pair's, of its block's top-left pixel) in
+/ place of half-up rounding, so a slow dark gradient steps every pixel instead of every band (#87): the same
+/ threshold in play and render, and in nv12_cpu (core/k/src/native.rs), which stays bit-equal. Samples are clamped to the
+/ nominal range (luma 16..235, chroma 16..240): 220/256 overshoots 219/255, and the dither would put some white on 236.
 ny:(w*h)%4
 nuv:(w*h)%8
 / luma: pixels 4i..4i+3
@@ -8,13 +12,21 @@ p:(4*i)&(w*h)-4
 ly:p%w
 lx:p!w
 c0:word[F;((ly)*w)+lx+0]
-y0:clamp[16+shr[(47*and[c0;255])+(157*and[shr[c0;8];255])+(16*and[shr[c0;16];255])+128;8];0;255]
+a0:xor[lx+0;ly]
+d0:or[or[shl[and[a0;1];3];shl[and[ly;1];2]];or[and[a0;2];shr[and[ly;2];1]]]
+y0:clamp[16+shr[(47*and[c0;255])+(157*and[shr[c0;8];255])+(16*and[shr[c0;16];255])+8+(16*d0);8];16;235]
 c1:word[F;((ly)*w)+lx+1]
-y1:clamp[16+shr[(47*and[c1;255])+(157*and[shr[c1;8];255])+(16*and[shr[c1;16];255])+128;8];0;255]
+a1:xor[lx+1;ly]
+d1:or[or[shl[and[a1;1];3];shl[and[ly;1];2]];or[and[a1;2];shr[and[ly;2];1]]]
+y1:clamp[16+shr[(47*and[c1;255])+(157*and[shr[c1;8];255])+(16*and[shr[c1;16];255])+8+(16*d1);8];16;235]
 c2:word[F;((ly)*w)+lx+2]
-y2:clamp[16+shr[(47*and[c2;255])+(157*and[shr[c2;8];255])+(16*and[shr[c2;16];255])+128;8];0;255]
+a2:xor[lx+2;ly]
+d2:or[or[shl[and[a2;1];3];shl[and[ly;1];2]];or[and[a2;2];shr[and[ly;2];1]]]
+y2:clamp[16+shr[(47*and[c2;255])+(157*and[shr[c2;8];255])+(16*and[shr[c2;16];255])+8+(16*d2);8];16;235]
 c3:word[F;((ly)*w)+lx+3]
-y3:clamp[16+shr[(47*and[c3;255])+(157*and[shr[c3;8];255])+(16*and[shr[c3;16];255])+128;8];0;255]
+a3:xor[lx+3;ly]
+d3:or[or[shl[and[a3;1];3];shl[and[ly;1];2]];or[and[a3;2];shr[and[ly;2];1]]]
+y3:clamp[16+shr[(47*and[c3;255])+(157*and[shr[c3;8];255])+(16*and[shr[c3;16];255])+8+(16*d3);8];16;235]
 yw:or[or[y0;shl[y1;8]];or[shl[y2;16];shl[y3;24]]]
 / chroma: samples 2j and 2j+1 of the (w/2) x (h/2) grid, j counting from the first chroma word
 j:0|(i-ny)&nuv-1
@@ -29,8 +41,10 @@ t03:word[F;(((2*cr)+1)*w)+x0+1]
 r0:and[t00;255]+and[t01;255]+and[t02;255]+and[t03;255]
 g0:and[shr[t00;8];255]+and[shr[t01;8];255]+and[shr[t02;8];255]+and[shr[t03;8];255]
 b0:and[shr[t00;16];255]+and[shr[t01;16];255]+and[shr[t02;16];255]+and[shr[t03;16];255]
-u0:clamp[128+shr[(-26*r0)+(-87*g0)+(112*b0)+512;10];0;255]
-v0:clamp[128+shr[(112*r0)+(-102*g0)+(-10*b0)+512;10];0;255]
+aq0:xor[x0;2*cr]
+dq0:or[or[shl[and[aq0;1];3];shl[and[2*cr;1];2]];or[and[aq0;2];shr[and[2*cr;2];1]]]
+u0:clamp[128+shr[(-26*r0)+(-87*g0)+(112*b0)+32+(64*dq0);10];16;240]
+v0:clamp[128+shr[(112*r0)+(-102*g0)+(-10*b0)+32+(64*dq0);10];16;240]
 x1:2*cc+1
 t10:word[F;((2*cr)*w)+x1]
 t11:word[F;((2*cr)*w)+x1+1]
@@ -39,7 +53,9 @@ t13:word[F;(((2*cr)+1)*w)+x1+1]
 r1:and[t10;255]+and[t11;255]+and[t12;255]+and[t13;255]
 g1:and[shr[t10;8];255]+and[shr[t11;8];255]+and[shr[t12;8];255]+and[shr[t13;8];255]
 b1:and[shr[t10;16];255]+and[shr[t11;16];255]+and[shr[t12;16];255]+and[shr[t13;16];255]
-u1:clamp[128+shr[(-26*r1)+(-87*g1)+(112*b1)+512;10];0;255]
-v1:clamp[128+shr[(112*r1)+(-102*g1)+(-10*b1)+512;10];0;255]
+aq1:xor[x1;2*cr]
+dq1:or[or[shl[and[aq1;1];3];shl[and[2*cr;1];2]];or[and[aq1;2];shr[and[2*cr;2];1]]]
+u1:clamp[128+shr[(-26*r1)+(-87*g1)+(112*b1)+32+(64*dq1);10];16;240]
+v1:clamp[128+shr[(112*r1)+(-102*g1)+(-10*b1)+32+(64*dq1);10];16;240]
 uvw:or[or[u0;shl[v0;8]];or[shl[u1;16];shl[v1;24]]]
 px:sel[i<ny;yw;sel[i<ny+nuv;uvw;tex[T;8;h]]]

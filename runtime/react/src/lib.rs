@@ -27,6 +27,7 @@ use serde_json::Value;
 
 mod thread;
 use thread::*;
+pub use thread::register_natives;
 mod commits;
 use commits::*;
 

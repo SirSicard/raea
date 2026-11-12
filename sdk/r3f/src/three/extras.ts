@@ -70,46 +70,115 @@ export function fire(had: THREE.Group | undefined, p: Props, seconds: number): T
   return g;
 }
 
-// ---- Grass: blades scattered over the sampled ground, one instanced mesh ----
-export function grass(spec: Props): THREE.InstancedMesh | undefined {
-  const s = spec.spec as { area: number[]; grid: [number, number]; height: number[]; density: number[]; tints?: [string, string][]; bladeHeight?: number; width?: [number, number]; seed?: number } | undefined;
+// ---- Grass: clumps of tapered blades over the sampled ground, one instanced mesh per patch ----
+// As raea-sys-grass grows it (sdk/render/src/3d/grass.tsx): clumps placed by the density grid, each a tuft of `blades`
+// leaning blades, root to tip in its patch's tints with a warm highlight on each tip, their normals the ground's (up,
+// tilted with the slope), so the field shades as the hill does. Detail by distance from the eye (the engine's steps:
+// every clump within 5 m, half of them in 8 blades to 14 m, a fifth in 5 blades beyond), each step a clump mesh per
+// tint drawn as instances.
+type GrassSpec = {
+  area: number[]; grid: [number, number]; height: number[]; density: number[]; patch?: number[]; size?: number[];
+  tints?: [string, string][]; highlight?: string; highlightMix?: number; blades?: number; bladeHeight?: number; width?: [number, number];
+  spread?: number; lean?: [number, number]; scale?: [number, number]; seed?: number; lod?: { to: number; keep: number; blades: number }[];
+};
+const LOD = [{ to: 5, keep: 1, blades: 14 }, { to: 14, keep: 0.5, blades: 8 }, { to: Infinity, keep: 0.2, blades: 5 }];
+
+function clumpGeometry(s: GrassSpec, tint: number, n: number, seed: number) {
+  const r = rng(seed);
+  const [rootHex, tipHex] = s.tints?.[tint] ?? s.tints?.[0] ?? ["#2c4a1a", "#5f8a2c"];
+  const root = new THREE.Color(rootHex), tip = new THREE.Color(tipHex), hi = new THREE.Color(s.highlight ?? "#f2e7a0");
+  const top = tip.clone().lerp(hi, s.highlightMix ?? 0.22);
+  const H = s.bladeHeight ?? 0.3, [w0, w1] = s.width ?? [0.034, 0.05], spread = s.spread ?? 0.06, [l0, l1] = s.lean ?? [0.2, 0.7];
+  const pos: number[] = [], nor: number[] = [], col: number[] = [], idx: number[] = [];
+  const seg = 3;
+  for (let k = 0; k < n; k++) {
+    const a = r() * Math.PI * 2, d = Math.sqrt(r()) * spread, x = Math.cos(a) * d, z = Math.sin(a) * d;
+    const ang = r() * Math.PI * 2, ca = Math.cos(ang), sa = Math.sin(ang);
+    const h = H * (0.55 + r() * 0.75), w = w0 + r() * (w1 - w0), lean = l0 + r() * (l1 - l0);
+    const o = pos.length / 3;
+    for (let i = 0; i <= seg; i++) {
+      const t = i / seg, bend = lean * t * t * h, hw = (w * (1 - t)) / 2 + 0.0008;
+      const cx = x + ca * bend, cz = z + sa * bend, cy = h * t;
+      const c = i === seg ? top : root.clone().lerp(tip, t);
+      for (const side of [-1, 1]) {
+        pos.push(cx - sa * hw * side, cy, cz + ca * hw * side);
+        nor.push(0, 1, 0);
+        col.push(c.r, c.g, c.b);
+      }
+      if (i < seg) { const q = o + i * 2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+export function grass(spec: Props, eye?: THREE.Vector3): THREE.Group | undefined {
+  const s = spec.spec as GrassSpec | undefined;
   if (!s) return undefined;
   const [x0, z0, x1, z1] = s.area, [nx, nz] = s.grid;
-  const at = (gx: number, gz: number) => {
-    const i = Math.min(nx - 2, Math.max(0, Math.floor(gx))), k = Math.min(nz - 2, Math.max(0, Math.floor(gz)));
-    const fx = gx - i, fz = gz - k;
-    const v = (a: number[], ii: number, kk: number) => a[kk * nx + ii];
-    const lerp = (a: number[]) => (v(a, i, k) * (1 - fx) + v(a, i + 1, k) * fx) * (1 - fz) + (v(a, i, k + 1) * (1 - fx) + v(a, i + 1, k + 1) * fx) * fz;
-    return { h: lerp(s.height), d: lerp(s.density) };
+  const cell = (u: number, w: number) => [Math.min(nx - 2, Math.max(0, Math.floor(u))), Math.min(nz - 2, Math.max(0, Math.floor(w)))];
+  const lerp = (a: number[], u: number, w: number) => {
+    const [i, k] = cell(u, w), fx = u - i, fz = w - k, v = (ii: number, kk: number) => a[kk * nx + ii];
+    return (v(i, k) * (1 - fx) + v(i + 1, k) * fx) * (1 - fz) + (v(i, k + 1) * (1 - fx) + v(i + 1, k + 1) * fx) * fz;
   };
+  const nearest = (a: number[], u: number, w: number) => a[Math.round(Math.min(nz - 1, Math.max(0, w))) * nx + Math.round(Math.min(nx - 1, Math.max(0, u)))];
+  const gx = (x: number) => ((x - x0) / (x1 - x0)) * (nx - 1), gz = (z: number) => ((z - z0) / (z1 - z0)) * (nz - 1);
+  const hAt = (x: number, z: number) => lerp(s.height, gx(x), gz(z));
   const r = rng(s.seed ?? 7);
-  const area = (x1 - x0) * (z1 - z0);
-  const blades: [number, number, number, number][] = [];
-  const tries = Math.min(60000, Math.round(area * Math.max(...s.density)));
-  for (let i = 0; i < tries; i++) {
-    const u = r(), w = r();
-    const x = x0 + u * (x1 - x0), z = z0 + w * (z1 - z0);
-    const g = at(u * (nx - 1), w * (nz - 1));
-    if (r() * Math.max(...s.density) <= g.d) blades.push([x, g.h, z, r()]);
-  }
-  if (!blades.length) return undefined;
-  const h = s.bladeHeight ?? 0.35, [w0] = s.width ?? [0.03, 0.01];
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute([-w0, 0, 0, w0, 0, 0, 0, h, 0], 3));
-  geo.computeVertexNormals();
-  const [base, tip] = s.tints?.[0] ?? ["#3f6b2a", "#9cc25a"];
-  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(base).lerp(new THREE.Color(tip), 0.5), side: THREE.DoubleSide, roughness: 0.9 });
-  const m = new THREE.InstancedMesh(geo, mat, blades.length);
+  const steps = s.lod ?? LOD;
+  const tints = Math.max(1, s.tints?.length ?? 1);
+  const blades = s.blades ?? 14;
+  const [sc0, sc1] = s.scale ?? [0.85, 1.35];
+  const at = eye ?? new THREE.Vector3((x0 + x1) / 2, 0, z1);
+  // clumps per step and tint, as matrices
+  const mats: THREE.Matrix4[][][] = steps.map(() => Array.from({ length: tints }, () => []));
+  const cellArea = ((x1 - x0) / (nx - 1)) * ((z1 - z0) / (nz - 1));
   const o = new THREE.Object3D();
-  blades.forEach(([x, y, z, k], i) => {
-    o.position.set(x, y, z);
-    o.rotation.set((k - 0.5) * 0.4, k * Math.PI * 2, 0);
-    o.scale.setScalar(0.7 + k * 0.6);
-    o.updateMatrix();
-    m.setMatrixAt(i, o.matrix);
-  });
-  m.receiveShadow = true;
-  return m;
+  let total = 0;
+  for (let k = 0; k < nz - 1; k++)
+    for (let i = 0; i < nx - 1; i++) {
+      const d = (s.density[k * nx + i] + s.density[k * nx + i + 1] + s.density[(k + 1) * nx + i] + s.density[(k + 1) * nx + i + 1]) / 4;
+      let n = d * cellArea;
+      for (; n > 0; n--) {
+        if (n < 1 && r() > n) break;
+        const u = i + r(), w = k + r();
+        const x = x0 + (u / (nx - 1)) * (x1 - x0), z = z0 + (w / (nz - 1)) * (z1 - z0);
+        const dist = Math.hypot(x - at.x, z - at.z);
+        const step = steps.findIndex((st) => dist < st.to);
+        const st = step < 0 ? steps.length - 1 : step;
+        if (r() > steps[st].keep) continue;
+        const y = hAt(x, z), e = 0.1;
+        const dx = (hAt(x + e, z) - hAt(x - e, z)) / (2 * e), dz = (hAt(x, z + e) - hAt(x, z - e)) / (2 * e);
+        const size = (s.size ? lerp(s.size, u, w) : 1) * (sc0 + r() * (sc1 - sc0));
+        // a thinned step's clumps are wider, so the field stays as full
+        const widen = 1 / Math.sqrt(steps[st].keep);
+        o.position.set(x, y, z);
+        o.rotation.set(Math.atan(dz), r() * Math.PI * 2, -Math.atan(dx), "YXZ");
+        o.scale.set(size * widen, size, size * widen);
+        o.updateMatrix();
+        const tint = s.patch ? Math.min(tints - 1, nearest(s.patch, u, w)) : 0;
+        mats[st][tint].push(o.matrix.clone());
+        total++;
+      }
+    }
+  if (!total) return undefined;
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.9 });
+  steps.forEach((st, si) =>
+    mats[si].forEach((list, ti) => {
+      if (!list.length) return;
+      const m = new THREE.InstancedMesh(clumpGeometry(s, ti, Math.min(blades, st.blades), 100 + ti + si * 17), material, list.length);
+      list.forEach((mx, j) => m.setMatrixAt(j, mx));
+      m.receiveShadow = true;
+      m.frustumCulled = false;
+      group.add(m);
+    }),
+  );
+  return group;
 }
 
 // ---- Splat: the splats' centres in their colours (a .ply of 3DGS, or antimatter's .splat) ----

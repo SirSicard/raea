@@ -39,7 +39,7 @@ const BY_PARENT: [(&str, &str); 19] = [("AmbientLight", "ambient"), ("Bloom", "b
     ("AmbientOcclusion", "ssao"), ("AntiAliasing", "aa"), ("Shadows", "shadows"), ("Look", "framelook"), ("Outline", "outline"), ("Fisheye", "fisheye"), ("LensDistortion", "distortion"), ("MotionBlur", "mblur"), ("BevyResource", "resource")];
 
 fn walk(n: &Node3, parent: Mat4, out: &mut Vec<Item>) {
-    let item = |kind: &'static str, world: Mat4, material: Option<Node3>| Item { kind, props: n.props.clone(), shape: n.shape.clone(), material, world };
+    let item = |kind: &'static str, world: Mat4, material: Option<Node3>| Item { kind, props: n.props.clone(), shape: n.shape.clone(), at: n.at.clone(), material, world };
     match &*n.kind {
         "Group" => {
             let w = parent * local(&n.props);
@@ -213,6 +213,8 @@ pub fn items_of(scene: &[Node3]) -> Vec<Item> {
     for n in scene {
         walk(n, Mat4::IDENTITY, &mut out);
     }
+    // the cameras not drawing this frame (<Camera3d is_active={false}>) out, the piece's stamped with its shot (RR2)
+    active_cameras(&mut out);
     // a camera's own AmbientLight (<Camera3d>'s <AmbientLight> child, Bevy 0.20's component) lights its view in place of
     // the scene's others (GlobalAmbientLight)
     let own = |i: &Item| i.kind == "ambient" && i.props.get("camera") == Some(&Value::Bool(true));
@@ -244,29 +246,6 @@ fn placement(p: &mut Program, row: &mut BTreeMap<String, V>, id: &str, its: &[It
             exact(p, row, id, name, &sc.iter().map(|s| s[k]).collect::<Vec<_>>());
         }
     }
-}
-
-/// A screen's columns (<Screen>, <Model screens>): its spec (a panel's `screen`) or a model's `screens` and `hide`,
-/// JSON, from the first frame; the tube's power keyed when it changes.
-fn screen_columns(p: &mut Program, row: &mut BTreeMap<String, V>, id: &str, its: &[Item]) {
-    let first = &its[0].props;
-    for (k, col) in [("screen", "screen"), ("screens", "screens"), ("hide", "hide")] {
-        if let Some(v) = first.get(k).filter(|v| !v.is_null()) {
-            row.insert(col.into(), V::S(v.to_string()));
-        }
-    }
-    if its.iter().any(|i| i.props.contains_key("screenPower")) {
-        column(p, row, id, "screen_power", &its.iter().map(|i| n(&i.props, "screenPower", 1.0)).collect::<Vec<_>>());
-    }
-    // a flat screen's brightness over the frames (the spec holds the first; engine/screen.rs's sync_screens reads this)
-    if its.iter().any(|i| screen_bright(&i.props).is_some()) {
-        column(p, row, id, "screen_bright", &its.iter().map(|i| screen_bright(&i.props).unwrap_or(1.0)).collect::<Vec<_>>());
-    }
-}
-
-/// A flat screen's `brightness`, from its spec (Screen's prop)
-fn screen_bright(props: &Map<String, Value>) -> Option<f64> {
-    props.get("screen")?.get("brightness")?.as_f64()
 }
 
 /// The lights, meshes, models and pictures in space, as rows, from each frame's parts.

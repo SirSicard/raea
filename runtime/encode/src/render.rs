@@ -4,6 +4,14 @@
 use super::*;
 use raea_runtime_view::{cpuview, gpuview};
 
+/// A render's timings as one JSON line on stderr, with RAEA_RENDER_STATS=1 (the benches read it; a person's terminal
+/// shows only what the render made)
+fn print_stats(line: serde_json::Value) {
+    if std::env::var("RAEA_RENDER_STATS").as_deref() == Ok("1") {
+        eprintln!("{line}");
+    }
+}
+
 /// Render a loaded edit (see `render_file`; `dir` is where its relative media paths start).
 pub fn render(prog: &Program, rows: &[Tup], dir: &Path, out: &Path, ro: &RenderOpts) -> Result<(), String> {
     render_with(prog, rows, dir, out, ro, None)
@@ -132,7 +140,7 @@ pub fn render_fed(
     if hashes {
         std::fs::write(out, lines.join("\n") + "\n").map_err(|e| e.to_string())?;
     }
-    eprintln!("{}", serde_json::json!({"direct": true, "fed": true, "frames": list.len(), "fps_incl_encode": list.len() as f64 / frames_s, "setup_s": setup_s, "finish_s": finish_s, "sound_s": sent,
+    print_stats(serde_json::json!({"direct": true, "fed": true, "frames": list.len(), "fps_incl_encode": list.len() as f64 / frames_s, "setup_s": setup_s, "finish_s": finish_s, "sound_s": sent,
         "bytes": stats.as_ref().map(|s| s.bytes), "video": stats.as_ref().map(|s| s.video_codec.clone()), "times": dt.json()}));
     Ok(())
 }
@@ -210,7 +218,7 @@ pub fn render_with(prog: &Program, rows: &[Tup], dir: &Path, out: &Path, ro: &Re
         if hashes {
             std::fs::write(out, lines.join("\n") + "\n").map_err(|e| e.to_string())?;
         }
-        eprintln!("{}", serde_json::json!({"direct": true, "cpu": true, "frames": list.len(), "fps_incl_encode": list.len() as f64 / frames_s, "setup_s": setup_s,
+        print_stats(serde_json::json!({"direct": true, "cpu": true, "frames": list.len(), "fps_incl_encode": list.len() as f64 / frames_s, "setup_s": setup_s,
             "bytes": stats.as_ref().map(|s| s.bytes), "video": stats.as_ref().map(|s| s.video_codec.clone()), "times": tm.json()}));
         return Ok(());
     }
@@ -294,7 +302,7 @@ pub fn render_with(prog: &Program, rows: &[Tup], dir: &Path, out: &Path, ro: &Re
         if hashes {
             std::fs::write(&out, lines.join("\n") + "\n").map_err(|e| e.to_string())?;
         }
-        eprintln!("{}", serde_json::json!({"direct": true, "frames": list.len(), "fps_incl_encode": list.len() as f64 / frames_s, "setup_s": setup_s, "finish_s": finish_s, "encoder_drain_s": drain_s,
+        print_stats(serde_json::json!({"direct": true, "frames": list.len(), "fps_incl_encode": list.len() as f64 / frames_s, "setup_s": setup_s, "finish_s": finish_s, "encoder_drain_s": drain_s,
             "bytes": stats.as_ref().map(|s| s.bytes), "video": stats.as_ref().map(|s| s.video_codec.clone()), "times": dt.json(), "pool_mb": v.pool_bytes as f64 / 1e6, "upload_cpu_ms_per_upload": v.upload_cpu_ms / dt.uploads.max(1) as f64}));
         return Ok(());
     }
@@ -372,8 +380,7 @@ pub fn render_with(prog: &Program, rows: &[Tup], dir: &Path, out: &Path, ro: &Re
         } else {
             None
         };
-        eprintln!(
-            "{}",
+        print_stats(
             serde_json::json!({"frames": list.len(), "video": stats.video_codec, "audio": stats.audio_codec, "bytes": stats.bytes,
                 "render_fps": n / render_s, "overlay_drawn_reused": e.overlay_stats(), "stages_ms_per_frame": stages, "pool_uploads_reuses_bytes": e.pool_stats(), "gpu_stage_ms": e.gpu_stage_times().map(|(m, n)| serde_json::json!({"clip_uploads": m[0], "overlay_upload": m[1], "composite": m[2], "nv12": m[3], "frames": n})), "encode_fps": n / encode_s, "ssim": ssim, "seconds": t0.elapsed().as_secs_f64(), "audio_s": audio_s,
                 "lufs": mix.as_ref().map(raea_io_media::audio::lufs), "peak_db": mix.as_ref().map(raea_io_media::audio::peak_db)})

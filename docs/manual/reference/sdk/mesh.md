@@ -387,7 +387,7 @@ copy together). Rotation in radians, XYZ order, as everywhere.
 | Field | Type | What it is |
 | --- | --- | --- |
 | `src` | `string` | a glTF file drawn at every placement: staticFile("models/house.glb"). Without it, a geometry child (or `shape`) and a material child draw a mesh at every placement |
-| `at` (required) | `Instance[]` | where each copy stands. Fixed for the shot: the first frame's list is drawn on every frame (move, turn, scale, hide or recolour the whole set by the Instances' own props) |
+| `at` (required) | `Instance[]` | where each copy stands, this frame: a list that changes moves the copies with it (each distinct list is kept, so a set of thousands moving every frame costs a list a frame; moving the whole set by the Instances' own props costs nothing). How many copies is the first frame's: a frame with another count holds the list before it |
 | `name` | `string` | the entity's name, for picking, the inspector and world.* |
 | `position` | `Vec3` | where it stands, metres (x, y, z) |
 | `rotation` | `Vec3` | radians |

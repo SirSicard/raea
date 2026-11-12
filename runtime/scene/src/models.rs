@@ -131,7 +131,7 @@ pub(crate) fn models_rows(tr: &Tracks, names: &[String], p: &mut Program) {
         meshseq::cloth_columns(p, &mut row, &id, &its);
         placement(p, &mut row, &id, &its);
         visible(p, &mut row, &id, &track);
-        instances_column(&mut row, &its);
+        instances_column(p, &mut row, &id, &its);
         model_shadows(&mut row, &its);
         pass_column(p, &mut row, &id, &its, &names);
         p.spawns.push(("model".into(), vec![row]));

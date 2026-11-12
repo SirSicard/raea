@@ -8,7 +8,8 @@ pub(crate) struct Run {
     pub(crate) from: f64,
     pub(crate) to: f64,
     pub(crate) box_: [f64; 4],
-    /// its box on every frame it shows its whole text: a text the camera carries (a sign on a panning street) moves
+    /// where its letters are on every frame it shows its whole text (the manifest's `ink`, else its box: a centred line in
+    /// a full-width box is nowhere near x = 0, #89): a text the camera carries (a sign on a panning street) moves
     /// through the frame's edges and zones, which only counts against it when no frame shows it clear
     pub(crate) boxes: Vec<[f64; 4]>,
     pub(crate) color: String,
@@ -61,7 +62,8 @@ pub(crate) fn text_runs(manifest: &Value) -> Vec<Run> {
         let mut next = Vec::new();
         for x in shown {
             let text = x["text"].as_str().unwrap_or("").trim().to_string();
-            let b = x["box"].as_array().map(|b| [0, 1, 2, 3].map(|i| b.get(i).and_then(Value::as_f64).unwrap_or(0.0))).unwrap_or([0.0; 4]);
+            let quad = |k: &str| x[k].as_array().map(|b| [0, 1, 2, 3].map(|i| b.get(i).and_then(Value::as_f64).unwrap_or(0.0)));
+            let (b, ink) = (quad("box").unwrap_or([0.0; 4]), quad("ink"));
             let k = key(&text);
             let found = open.iter().position(|r| {
                 let rk = key(&r.text);
@@ -77,7 +79,7 @@ pub(crate) fn text_runs(manifest: &Value) -> Vec<Run> {
             if text.len() >= r.text.len() {
                 r.text = text;
                 r.box_ = b;
-                r.boxes.push(b);
+                r.boxes.push(ink.unwrap_or(b));
             }
             r.to = t + 1.0 / fps;
             r.color = x["color"].as_str().unwrap_or("rgb(255, 255, 255)").to_string();
@@ -169,7 +171,9 @@ pub(crate) fn text_rules(runs: &[Run], heard: Option<&[Word]>, w: f64, h: f64, s
             issues.push(Issue { rule: "clipped", p: 0, at: Some(r.from), says: format!("{q} runs off the frame (box {x:.0},{y:.0} {bw:.0}x{bh:.0} in {w:.0}x{h:.0}); fit it or break the line") });
         } else if r.boxes.iter().all(zoned) {
             unsafe_ += 1;
-            issues.push(Issue { rule: "safe-area", p: 1, at: Some(r.from), says: format!("{q} sits in the app's UI zone (keep {zt:.0} px top, {zb:.0} bottom, {zl:.0} left, {zr:.0} right clear)") });
+            let [ix, iy, iw, ih] = *r.boxes.last().unwrap_or(&r.box_);
+            let edge = if iy < zt { format!("the top (keep {zt:.0} px clear)") } else if iy + ih > h - zb { format!("the bottom (keep {zb:.0} px clear)") } else if ix < zl { format!("the left (keep {zl:.0} px clear)") } else { format!("the right (keep {zr:.0} px clear)") };
+            issues.push(Issue { rule: "safe-area", p: 1, at: Some(r.from), says: format!("{q} sits in the app's UI zone at {edge}: its {} {ix:.0},{iy:.0} {iw:.0}x{ih:.0} in {w:.0}x{h:.0}", if r.boxes.last() == Some(&r.box_) { "box" } else { "letters" }) });
         }
         let words = r.text.split_whitespace().count() as f64;
         let need = (0.3 * words).max(1.0);

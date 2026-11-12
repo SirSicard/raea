@@ -3,7 +3,7 @@ import { Children, Fragment, isValidElement, useContext, useRef, type CSSPropert
 import { LocalTimeContext, TimeBaseContext, timeBase, useClockState, useLocalTime, type LocalTime, type TimeBase } from "@raea/app/clock";
 // assets stays in raea until it moves to @raea/asset (docs/sdk.feature S1d)
 import { isGeneratedAsset } from "@raea/asset/assets";
-import { Audio } from "./media";
+import { Audio, MediaEndContext } from "./media";
 
 export interface AbsoluteFillProps {
   /** merged over the fill's own style (absolute, inset 0, a flex column) */
@@ -79,9 +79,11 @@ function Shifted(props: {
   label?: string;
   /** the composition frame after its last, when it ends (`raea world`'s Shot, docs/direction.feature DR1) */
   end?: number;
+  /** the composition frame its media stops at, when not `end` (a Loop pass's end): a fadeOut ends there */
+  stops?: number;
   children?: ReactNode;
 }) {
-  const { owner, time, base, layout, style, className, label, end, children } = props;
+  const { owner, time, base, layout, style, className, label, end, stops = end, children } = props;
   if (layout !== "absolute-fill" && layout !== "none") {
     throw new RangeError(`${owner}: layout must be "absolute-fill" or "none", got "${layout}"`);
   }
@@ -101,9 +103,15 @@ function Shifted(props: {
     );
   return (
     <TimeBaseContext.Provider value={base}>
-      <LocalTimeContext.Provider value={time}>{inner}</LocalTimeContext.Provider>
+      <LocalTimeContext.Provider value={time}>{stops === undefined ? inner : <StopsAt end={stops}>{inner}</StopsAt>}</LocalTimeContext.Provider>
     </TimeBaseContext.Provider>
   );
+}
+
+/** Media under it stops at composition frame `end`, or sooner where an outer one does (media.tsx fadedOut) */
+function StopsAt(props: { end: number; children?: ReactNode }) {
+  const outer = useContext(MediaEndContext);
+  return <MediaEndContext.Provider value={Math.min(outer, props.end)}>{props.children}</MediaEndContext.Provider>;
 }
 
 /** The same LocalTime object as last render when nothing in it changed (a Freeze's subtree, a held frame). */
@@ -147,7 +155,7 @@ export function Sequence(props: SequenceProps) {
   if (layout === "none" && style === undefined && className === undefined) {
     return (
       <TimeBaseContext.Provider value={base}>
-        <LocalTimeContext.Provider value={time}>{props.children}</LocalTimeContext.Provider>
+        <LocalTimeContext.Provider value={time}>{durationInFrames === Infinity ? props.children : <StopsAt end={time.origin + durationInFrames}>{props.children}</StopsAt>}</LocalTimeContext.Provider>
       </TimeBaseContext.Provider>
     );
   }
@@ -254,7 +262,7 @@ export function Loop(props: LoopProps) {
   const time: LocalTime = p && p.frame === lf && p.origin === lo && p.width === parent.width && p.height === parent.height ? p : (r.current = { frame: lf, origin: lo, width: parent.width, height: parent.height });
   const base = timeBase(pbase.origin + pass * durationInFrames, pbase.freeze === null ? null : pbase.freeze - pass * durationInFrames);
   return (
-    <Shifted owner="Loop" time={time} base={base} layout={layout} style={style} className={className} label={name}>
+    <Shifted owner="Loop" time={time} base={base} layout={layout} style={style} className={className} label={name} stops={lo + durationInFrames}>
       {props.children}
     </Shifted>
   );

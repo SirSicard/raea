@@ -1,0 +1,23 @@
+[package]
+name = "raea-app-engines"
+version = "0.1.0"
+edition = "2024"
+license = "FSL-1.1-ALv2"
+publish = false
+description = "The `raea` verbs that script other engines from TypeScript: Blender (`setup blender`, `blender run`) and Godot with GodotJS (`setup godot`, `godot run|types|open`)"
+
+[dependencies]
+# Blender found or downloaded, its scripts in Python, and the helpers Godot's setup shares (apps/tools/src/blender.rs)
+raea-app-tools = { path = "../tools" }
+raea-io-home = { path = "../../io/home" }
+# a TypeScript script bundled and run on raea's engine, posting raea/blender's batches to the bridge (blender.post)
+raea-runtime-bundle = { path = "../../runtime/bundle" }
+raea-runtime-export = { path = "../../runtime/export" }
+raea-runtime-calls = { path = "../../runtime/calls" }
+# a composition's 3D as scene.json, a Godot project from it, and changes read back (raea scene export, raea godot export|back,
+# raea blender open|back)
+raea-app-interchange = { path = "../interchange" }
+serde_json = "1"
+# Godot with GodotJS, unpacked from its release zip (`raea setup godot`), and the script path the bundler imports
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
+dunce = "1"

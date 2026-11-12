@@ -1,26 +1,28 @@
 //! `raea setup blender` and `raea blender run` (docs/skills.feature SK11). Blender is GPL, so raea never bundles it: it
 //! finds the person's Blender, or downloads the current LTS from blender.org into ~/.raea/tools/blender, and runs it as
-//! its own program. The setup also installs the MCP for Blender add-on (github.com/ahujasid/mcp-for-blender, MIT) into
-//! that Blender, so an agent's `blender` MCP server (raea skills install adds it) can drive a running Blender.
+//! its own program. The setup also installs two add-ons into that Blender: raea's own (sdk/blender/python/raea_blender),
+//! so a TypeScript script drives the Blender the person has open (RAEA_BLENDER=live; docs/blender.feature BL28), and
+//! MCP for Blender (github.com/ahujasid/mcp-for-blender, MIT), so an agent's `blender` MCP server (raea skills install
+//! adds it) can drive it too.
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 type R<T> = Result<T, String>;
 
-pub const USAGE: &str = "raea setup blender [--check] [--download]   (find Blender or download the LTS into ~/.raea/tools/blender, and install its MCP add-on)\n       raea blender run SCRIPT.py [ARGS...]   (blender --background --python SCRIPT.py -- ARGS, headless; blender/X.py missing from the project is copied from the library: convert, decimate, repair, split, bake, rig, cloth)";
+pub const USAGE: &str = "raea setup blender [--check] [--download]   (find Blender or download the LTS into ~/.raea/tools/blender, and install raea's add-on and the MCP add-on)\n       raea blender run SCRIPT.py [ARGS...]   (blender --background --python SCRIPT.py -- ARGS, headless; blender/X.py missing from the project is copied from the library: convert, decimate, repair, split, bake, rig, cloth)\n       raea blender run SCRIPT.ts [FILE.blend] [ARGS...]   (a TypeScript script against Blender's whole Python API through raea/blender: bpy, bmesh, mathutils, typed; a headless Blender, FILE.blend opened, quit when the script ends)";
 
 /// The LTS series raea downloads; the newest patch in blender.org/release/Blender<LTS>/ is taken. Moved when Blender
 /// ships a new LTS (blender.org/download/lts).
 const LTS: &str = "5.2";
 
-/// Where raea keeps the Blender it downloads.
-fn own_dir() -> R<PathBuf> {
-    Ok(crate::agent_mcp::user_home()?.join(".raea/tools/blender"))
+/// Where raea keeps a tool it downloads, ~/.raea/tools/NAME: Blender here, Godot in apps/engines.
+pub fn own_dir(name: &str) -> R<PathBuf> {
+    Ok(crate::agent_mcp::user_home()?.join(".raea/tools").join(name))
 }
 
 /// The Blender binary inside raea's own download, per platform.
 fn own_binary() -> R<PathBuf> {
-    let d = own_dir()?;
+    let d = own_dir("blender")?;
     Ok(if cfg!(target_os = "macos") { d.join("Blender.app/Contents/MacOS/Blender") } else if cfg!(windows) { d.join("blender.exe") } else { d.join("blender") })
 }
 
@@ -51,10 +53,21 @@ pub fn find() -> Option<(PathBuf, &'static str)> {
 /// `blender --version`'s first line ("Blender 5.2.1 LTS").
 fn version(bin: &Path) -> R<String> {
     let o = Command::new(bin).arg("--version").output().map_err(|e| format!("{}: {e}", bin.display()))?;
-    String::from_utf8_lossy(&o.stdout).lines().find(|l| l.starts_with("Blender ")).map(str::to_string).ok_or_else(|| format!("{} --version printed no version", bin.display()))
+    String::from_utf8_lossy(&o.stdout).lines().find(|l| l.starts_with("Blender ")).map(str::to_string).ok_or_else(|| {
+        let err = String::from_utf8_lossy(&o.stderr);
+        if err.contains("error while loading shared libraries") {
+            format!("{} can't start: {} (on Debian or Ubuntu: apt install {LINUX_LIBS})", bin.display(), err.trim())
+        } else {
+            format!("{} --version printed no version", bin.display())
+        }
+    })
 }
 
-fn run(cmd: &mut Command, what: &str) -> R<String> {
+/// What Blender's Linux build needs that a slim Debian (trixie) lacks: found 11-11 by running it in debian:trixie-slim
+/// (docs/blender.feature BL29); CUDA, HIP and oneAPI are loaded only when Cycles renders on those GPUs.
+const LINUX_LIBS: &str = "libx11-6 libxi6 libxext6 libxfixes3 libxrender1 libxkbcommon0 libsm6 libice6 libgl1 libopengl0";
+
+pub fn run(cmd: &mut Command, what: &str) -> R<String> {
     let o = cmd.output().map_err(|e| format!("{what}: {e}"))?;
     if !o.status.success() {
         return Err(format!("{what} failed: {}{}", String::from_utf8_lossy(&o.stderr).trim(), String::from_utf8_lossy(&o.stdout).trim()));
@@ -89,11 +102,14 @@ fn newest(listing: &str) -> Option<String> {
     best.map(|(_, v)| v)
 }
 
-fn sha256(file: &Path) -> R<String> {
+pub fn sha256(file: &Path) -> R<String> {
     let out = if cfg!(windows) {
         run(Command::new("certutil").arg("-hashfile").arg(file).arg("SHA256"), "certutil")?.lines().nth(1).unwrap_or_default().replace(' ', "")
-    } else {
+    } else if on_path("shasum").is_some() {
         run(Command::new("shasum").args(["-a", "256"]).arg(file), "shasum")?.split_whitespace().next().unwrap_or_default().to_string()
+    } else {
+        // a slim Linux (debian:trixie-slim) has coreutils' sha256sum, not perl's shasum
+        run(Command::new("sha256sum").arg(file), "sha256sum")?.split_whitespace().next().unwrap_or_default().to_string()
     };
     Ok(out.to_lowercase())
 }
@@ -104,7 +120,7 @@ fn download() -> R<(PathBuf, String)> {
     let listing = run(Command::new("curl").args(["-fsSL", &base]), "curl")?;
     let v = newest(&listing).ok_or_else(|| format!("no Blender {LTS} release listed at {base}"))?;
     let name = asset(&v)?;
-    let dir = own_dir()?;
+    let dir = own_dir("blender")?;
     let tmp = dir.with_file_name("blender.download");
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(&tmp).map_err(|e| format!("{}: {e}", tmp.display()))?;
@@ -140,34 +156,81 @@ fn download() -> R<(PathBuf, String)> {
     Ok((own_binary()?, format!("downloaded Blender {v} LTS from blender.org")))
 }
 
-/// Python run inside Blender (background): prints the user add-ons folder, or whether the add-on is enabled.
+/// Python run inside Blender (background): prints the user add-ons folder.
 const ADDONS_DIR: &str = "import bpy; print('RAEA_ADDONS=' + bpy.utils.user_resource('SCRIPTS', path='addons', create=True))";
-const ENABLE: &str = "import addon_utils, bpy; addon_utils.enable('blender_mcp', default_set=True, persistent=True); bpy.ops.wm.save_userpref(); print('RAEA_ENABLED=' + str(addon_utils.check('blender_mcp')[1]))";
-const CHECK: &str = "import addon_utils; print('RAEA_ENABLED=' + str(addon_utils.check('blender_mcp')[1]))";
 
 fn py(bin: &Path, code: &str, key: &str) -> R<String> {
     let out = run(Command::new(bin).args(["--background", "--factory-startup", "--python-expr", code]), "blender")?;
     out.lines().find_map(|l| l.strip_prefix(key)).map(str::to_string).ok_or_else(|| format!("blender printed no {key}"))
 }
 
-/// The add-on: uvx mcp-for-blender's own installer writes it into this Blender's add-ons folder, then Blender enables it.
+/// Whether an add-on is enabled in this Blender's saved preferences (--factory-startup would skip them).
+fn enabled(bin: &Path, module: &str) -> R<bool> {
+    let code = format!("import addon_utils; print('RAEA_ENABLED=' + str(addon_utils.check('{module}')[1]))");
+    run(Command::new(bin).args(["--background", "--python-expr", &code]), "blender").map(|o| o.contains("RAEA_ENABLED=True"))
+}
+
+/// Enables an add-on that is in the add-ons folder, and saves the preferences so it starts with Blender.
+fn enable(bin: &Path, module: &str, dir: &str, name: &str) -> R<()> {
+    let code = format!("import addon_utils, bpy; addon_utils.enable('{module}', default_set=True, persistent=True); bpy.ops.wm.save_userpref(); print('RAEA_ENABLED=' + str(addon_utils.check('{module}')[1]))");
+    let on = run(Command::new(bin).args(["--background", "--python-expr", &code]), "blender")?;
+    if !on.contains("RAEA_ENABLED=True") {
+        return Err(format!("the add-on is in {dir} but Blender didn't enable it: enable \"{name}\" in Preferences > Add-ons"));
+    }
+    Ok(())
+}
+
+/// The MCP add-on: uvx mcp-for-blender's own installer writes it into this Blender's add-ons folder, then Blender enables it.
 fn addon(bin: &Path, check: bool) -> R<String> {
-    // --factory-startup skips the person's add-ons for speed, so the check reads the saved preferences instead
-    let state = |b: &Path| run(Command::new(b).args(["--background", "--python-expr", CHECK]), "blender").map(|o| o.contains("RAEA_ENABLED=True"));
-    if state(bin)? {
+    if enabled(bin, "blender_mcp")? {
         return Ok("MCP add-on enabled".into());
     }
     if check {
         return Ok("MCP add-on not installed: raea setup blender installs it".into());
     }
-    let uvx = on_path(if cfg!(windows) { "uvx.exe" } else { "uvx" }).ok_or("the MCP add-on comes from uv's uvx: install uv (https://docs.astral.sh/uv/getting-started/installation/), then run raea setup blender again")?;
+    // the MCP add-on is for agents; scripts don't need it, so a machine without uv still finishes its setup
+    let Some(uvx) = on_path(if cfg!(windows) { "uvx.exe" } else { "uvx" }) else {
+        return Ok("MCP add-on not installed: it comes from uv's uvx (install uv: https://docs.astral.sh/uv/getting-started/installation/, then raea setup blender again)".into());
+    };
     let dir = py(bin, ADDONS_DIR, "RAEA_ADDONS=")?;
-    run(Command::new(&uvx).args(["mcp-for-blender", "install-addon", "--addons-dir", &dir]), "uvx mcp-for-blender install-addon")?;
-    let on = run(Command::new(bin).args(["--background", "--python-expr", ENABLE]), "blender")?;
-    if !on.contains("RAEA_ENABLED=True") {
-        return Err(format!("the add-on is in {dir} but Blender didn't enable it: enable \"MCP for Blender\" in Preferences > Add-ons"));
-    }
+    // its installer prints arrows, which Python can't encode for Windows' cp1252 console: it threw and setup failed
+    // (11-11), so it writes UTF-8
+    run(Command::new(&uvx).args(["mcp-for-blender", "install-addon", "--addons-dir", &dir]).env("PYTHONIOENCODING", "utf-8").env("PYTHONUTF8", "1"), "uvx mcp-for-blender install-addon")?;
+    enable(bin, "blender_mcp", &dir, "MCP for Blender")?;
     Ok(format!("MCP add-on installed now ({dir})"))
+}
+
+/// raea's add-on as raea ships it (its home's sdk/, else this checkout's): the folder and its Python files.
+fn bridge_files() -> R<(PathBuf, Vec<PathBuf>)> {
+    let shipped = raea_io_home::home().join("sdk/blender/python/raea_blender");
+    let here = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../sdk/blender/python/raea_blender");
+    let dir = [shipped.clone(), here].into_iter().find(|d| d.is_dir()).ok_or_else(|| format!("raea's Blender add-on isn't here ({}): reinstall raea", shipped.display()))?;
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "py")).collect();
+    files.sort();
+    Ok((dir, files))
+}
+
+/// raea's add-on (BL28): copied into this Blender's add-ons folder, replacing an older copy, and enabled. Started with a
+/// window, that Blender serves raea/blender on 127.0.0.1 behind a token and writes ~/.raea/blender/live.json.
+fn bridge_addon(bin: &Path, check: bool) -> R<String> {
+    let (_, files) = bridge_files()?;
+    let dir = py(bin, ADDONS_DIR, "RAEA_ADDONS=")?;
+    let to = Path::new(&dir).join("raea_blender");
+    let current = files.iter().all(|f| f.file_name().is_some_and(|n| std::fs::read(to.join(n)).ok() == std::fs::read(f).ok()));
+    if current && enabled(bin, "raea_blender")? {
+        return Ok("raea's add-on enabled (live: start Blender, then RAEA_BLENDER=live or connect({ live: true }))".into());
+    }
+    if check {
+        return Ok(format!("raea's add-on {}: raea setup blender installs it", if to.is_dir() { "out of date or off" } else { "not installed" }));
+    }
+    let _ = std::fs::remove_dir_all(&to);
+    std::fs::create_dir_all(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+    for f in &files {
+        let name = f.file_name().unwrap_or_default();
+        std::fs::copy(f, to.join(name)).map_err(|e| format!("{}: {e}", to.join(name).display()))?;
+    }
+    enable(bin, "raea_blender", &dir, "raea bridge")?;
+    Ok(format!("raea's add-on installed now ({}; live: start Blender, then RAEA_BLENDER=live or connect({{ live: true }}))", to.display()))
 }
 
 /// `raea setup blender [--check] [--download]`.
@@ -176,17 +239,20 @@ pub fn setup(args: &[String]) -> R<String> {
     let fresh = args.iter().any(|a| a == "--download");
     let (bin, from) = match find().filter(|_| !fresh) {
         Some((b, f)) => (b, f.to_string()),
-        None if check => return Ok(format!("CHECKED  no Blender found (raea.blender, {}, PATH): raea setup blender downloads Blender {LTS} LTS", own_dir()?.display())),
+        None if check => return Ok(format!("CHECKED  no Blender found (raea.blender, {}, PATH): raea setup blender downloads Blender {LTS} LTS", own_dir("blender")?.display())),
         None => {
             let (b, f) = download()?;
-            run(Command::new("git").args(["config", "--global", "raea.blender"]).arg(&b), "git config")?;
+            // remembered for tools that read raea.blender; find() takes raea's download anyway, so a machine without
+            // git (a Mac before its command line tools, Windows) is set up all the same
+            let _ = run(Command::new("git").args(["config", "--global", "raea.blender"]).arg(&b), "git config");
             (b, f)
         }
     };
     let v = version(&bin)?;
+    let own = bridge_addon(&bin, check)?;
     let add = addon(&bin, check)?;
     let head = if check { "CHECKED " } else { "APPLIED " };
-    Ok(format!("{head} {v} ({from})\n  {}\n  {add}\n  headless: raea blender run SCRIPT.py; live: start Blender and the agent's `blender` MCP server connects (raea skills install adds it)", bin.display()))
+    Ok(format!("{head} {v} ({from})\n  {}\n  {own}\n  {add}\n  headless: raea blender run SCRIPT.py|.ts; live: start Blender and the agent's `blender` MCP server connects (raea skills install adds it)", bin.display()))
 }
 
 /// The library's scripts (sdk/guides/craft/bevy/blender: convert, decimate, repair, split, bake, rig, cloth): a fix
@@ -236,6 +302,15 @@ mod tests {
         let listing = format!("<a href=\"blender-{LTS}.0-linux-x64.tar.xz\"> <a href=\"blender-{LTS}.12-macos-arm64.dmg\"> <a href=\"blender-{LTS}.3-windows-x64.zip\"> blender-{LTS}.9.sha256 blender-{LTS}.99beta");
         assert_eq!(newest(&listing), Some(format!("{LTS}.12")));
         assert_eq!(newest("nothing here"), None);
+    }
+
+    #[test]
+    fn sha256_of_a_known_file() {
+        let f = std::env::temp_dir().join(format!("raea-sha256-{}", std::process::id()));
+        std::fs::write(&f, b"abc").unwrap();
+        let got = sha256(&f);
+        let _ = std::fs::remove_file(&f);
+        assert_eq!(got.unwrap(), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 
     #[test]

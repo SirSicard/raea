@@ -42,7 +42,8 @@ type Pending = (With<MeshMaterial3d<StandardMaterial>>, Without<RaytracingMesh3d
 fn meshes(
     mut cmd: Commands,
     on: Query<(), Or<(With<SolariLighting>, With<Pathtracer>)>>,
-    q: Query<(Entity, &Mesh3d, Has<bevy::mesh::skinning::SkinnedMesh>, Has<bevy::mesh::morph::MeshMorphWeights>), Pending>,
+    q: Query<(Entity, &Mesh3d, &MeshMaterial3d<StandardMaterial>, Has<bevy::mesh::skinning::SkinnedMesh>, Has<bevy::mesh::morph::MeshMorphWeights>), Pending>,
+    mats: Res<Assets<StandardMaterial>>,
     mut assets: ResMut<Assets<Mesh>>,
     mut copies: Local<HashMap<AssetId<Mesh>, Option<Handle<Mesh>>>>,
     mut said: Local<bool>,
@@ -50,7 +51,18 @@ fn meshes(
     if on.is_empty() {
         return;
     }
-    for (e, m, skinned, morphed) in &q {
+    for (e, m, mat, skinned, morphed) in &q {
+        // what it adds to or tints is all it does: traced, Solari took it as an opaque card (a wind's dust and air
+        // streaks, additive sprites, cut a sunlit wall's light by a quarter). Left untraced it still draws, forward
+        match mats.get(&mat.0).map(|m| traced_alpha(m.alpha_mode)) {
+            Some(false) => {
+                cmd.entity(e).insert(Done);
+                continue;
+            }
+            // its material not made yet: decided on a later frame
+            None => continue,
+            Some(true) => {}
+        }
         if skinned || morphed {
             if !*said {
                 *said = true;
@@ -79,6 +91,12 @@ fn meshes(
             None => cmd.entity(e).insert(Done),
         };
     }
+}
+
+/// Whether a surface of this alpha mode is in the traced scene: not one that only adds light to what is behind it or
+/// multiplies it (a glow, a spark, dust, a tint), which has nothing of its own to block or bounce.
+fn traced_alpha(mode: AlphaMode) -> bool {
+    !matches!(mode, AlphaMode::Add | AlphaMode::Multiply)
 }
 
 enum Traceable {
@@ -131,6 +149,13 @@ mod tests {
         m.insert_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0f32, 0.0, 1.0]; 3]);
         m.insert_indices(Indices::U16(vec![0, 1, 2]));
         m
+    }
+
+    #[test]
+    fn an_additive_or_multiplying_surface_is_not_traced() {
+        // additive dust cards traced as opaque shaded a sunlit wall; opaque, masked and blended surfaces stay traced
+        assert!(!traced_alpha(AlphaMode::Add) && !traced_alpha(AlphaMode::Multiply));
+        assert!(traced_alpha(AlphaMode::Opaque) && traced_alpha(AlphaMode::Blend) && traced_alpha(AlphaMode::Mask(0.5)));
     }
 
     #[test]

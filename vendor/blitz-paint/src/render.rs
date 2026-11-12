@@ -1200,6 +1200,18 @@ impl<'dom, 'a> BlitzDomPainter<'dom, 'a> {
                     None if has_url => None,
                     None => convert_filters(&effects.filter.0).map(Arc::new),
                 };
+                // raea: a filter of opacity() functions alone is the group's alpha, as the `opacity` property is (Filter
+                // Effects 1 §10.9 scales the result's alpha), so it's drawn as the layer's alpha, not as a filter: a
+                // filtered element is an image the size of its box in Vello's atlas (8192 px a side), and twelve
+                // full-frame `filter: opacity()` layers at 2160x3840 (a motion blur of <Freeze> samples) outgrew it,
+                // so the frame was drawn without them (#96)
+                let only_opacity = !has_url && !effects.filter.0.is_empty() && effects.filter.0.iter().all(|f| matches!(f, crate::filters::StyloFilter::Opacity(_)));
+                let (filter, opacity) = if only_opacity {
+                    (None, opacity * effects.filter.0.iter().map(|f| if let crate::filters::StyloFilter::Opacity(a) = f { a.0 } else { 1.0 }).product::<f32>())
+                } else {
+                    (filter, opacity)
+                };
+                let has_opacity = has_opacity || opacity < 1.0;
                 // raea: backdrop-filter's url()s the same way, the backdrop clipped to the border box as its other
                 // filters are; a url() to no <filter> leaves the backdrop unfiltered
                 let has_backdrop_url = effects.backdrop_filter.0.iter().any(|f| matches!(f, crate::filters::StyloFilter::Url(_)));

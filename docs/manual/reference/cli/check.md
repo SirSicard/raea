@@ -7,6 +7,8 @@ sources: ["apps/check/src/lib.rs", "apps/check/src/quick.rs", "apps/direction/sr
 
 `raea check` has two speeds. On a composition with `--quick`, it renders three stills and measures the text:
 clipped, cramped, inside the safe areas, large enough to read, and what the stills' render found (3D parts clipping).
+The stills are a quarter in, the middle and the last frame of the length a render of frame 0 reports, however
+`durationInFrames` is written, and the report names them (`ok looked at frames 75, 150 and 299 of 300`).
 That takes about a second, so run it after every save. On an exported video, it measures everything the floor asks
 of a finished piece. Each finding is an error, a warn or a note (raea's one finding, as `raea scene lint` and a
 render's manifest have it), says on which frames and how to fix it, and the command exits 1 while an error stands.

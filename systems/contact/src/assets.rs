@@ -58,7 +58,7 @@ mod tests {
 
     fn item(kind: &'static str, props: serde_json::Value) -> Item {
         let Some(m) = props.as_object().cloned() else { unreachable!() };
-        Item { kind, props: Arc::new(m), shape: None, material: None, world: Mat4::IDENTITY }
+        Item { kind, props: Arc::new(m), shape: None, material: None, at: None, world: Mat4::IDENTITY }
     }
 
     #[test]

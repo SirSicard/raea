@@ -41,4 +41,4 @@ Every item moves through the same five steps: planned, making, posted, seen, and
 and its status shows beside its title. The number beside the Inbox counts what's posted and not seen yet, so you always
 know what's waiting for you.
 
-Next: [Inspect compositions and components](inspect.md).
+Next: [Share work for review](share-for-review.md), for people who don't use raea.

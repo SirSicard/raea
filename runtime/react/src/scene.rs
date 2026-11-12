@@ -42,6 +42,8 @@ thread_local! {
     static PROPS3D: std::cell::RefCell<bevy::ecs::entity::EntityHashMap<(String, std::sync::Arc<Map<String, Value>>, u64)>> = std::cell::RefCell::new(Default::default());
     /// each part's data-3d and data-shape as last read, shared
     static NAMES3D: std::cell::RefCell<bevy::ecs::entity::EntityHashMap<(std::sync::Arc<str>, Option<std::sync::Arc<str>>)>> = std::cell::RefCell::new(Default::default());
+    /// each part's data-at (an <Instances>' placements) as last read, shared while its text is the same (issue 84)
+    static AT3D: std::cell::RefCell<bevy::ecs::entity::EntityHashMap<std::sync::Arc<str>>> = std::cell::RefCell::new(Default::default());
     /// scenes read (scene_of): what's in PROPS3D but not read in the last two is let go
     static SCENE3D: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }

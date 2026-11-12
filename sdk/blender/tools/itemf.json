@@ -1,0 +1,203 @@
+{
+ "blender": "5.2.1",
+ "itemf": [
+  "ActionSlot.target_id_type",
+  "AnnotationLayers.active_note",
+  "Area.ui_type",
+  "AssetMetaData.preferred_import_method",
+  "AssetShelf.asset_library_reference",
+  "Attribute.domain",
+  "BlendDataNodeTrees.new(type)",
+  "BlendFileColorspace.working_space",
+  "Brush.direction",
+  "Brush.stroke_method",
+  "BrushTextureSlot.map_mode",
+  "CollectionExports.new(type)",
+  "ColorManagedDisplaySettings.display_device",
+  "ColorManagedInputColorspaceSettings.name",
+  "ColorManagedSequencerColorspaceSettings.name",
+  "ColorManagedViewSettings.look",
+  "ColorManagedViewSettings.view_transform",
+  "CompositorNodeConvertColorSpace.from_color_space",
+  "CompositorNodeConvertColorSpace.to_color_space",
+  "CompositorNodeCryptomatteV2.layer_name",
+  "CompositorNodeRLayers.layer",
+  "Constraint.owner_space",
+  "Constraint.target_space",
+  "Curve.fill_mode",
+  "DataTransferModifier.layers_uv_select_dst",
+  "DataTransferModifier.layers_uv_select_src",
+  "DataTransferModifier.layers_vcol_loop_select_dst",
+  "DataTransferModifier.layers_vcol_loop_select_src",
+  "DataTransferModifier.layers_vcol_vert_select_dst",
+  "DataTransferModifier.layers_vcol_vert_select_src",
+  "DataTransferModifier.layers_vgroup_select_dst",
+  "DataTransferModifier.layers_vgroup_select_src",
+  "DataTransferModifier.mix_mode",
+  "DynamicPaintSurface.surface_type",
+  "EnumProperty.default",
+  "EnumProperty.default_flag",
+  "FieldSettings.shape",
+  "FileAssetSelectParams.asset_library_reference",
+  "FileAssetSelectParams.import_method",
+  "FileSelectParams.display_type",
+  "FileSelectParams.recursion_level",
+  "FileSelectParams.sort_method",
+  "FluidDomainSettings.cache_data_format",
+  "FluidDomainSettings.cache_mesh_format",
+  "FluidDomainSettings.cache_noise_format",
+  "FluidDomainSettings.cache_particle_format",
+  "FluidDomainSettings.color_ramp_field",
+  "FluidDomainSettings.openvdb_data_depth",
+  "FluidFlowSettings.flow_source",
+  "ForeachGeometryElementGenerationItem.socket_type",
+  "ForeachGeometryElementInputItem.socket_type",
+  "ForeachGeometryElementMainItem.socket_type",
+  "FunctionNodeInputMenu.value",
+  "FunctionNodeRandomValue.data_type",
+  "GeometryNodeCaptureAttribute.domain",
+  "GeometryNodeClosureToListItem.socket_type",
+  "GeometryNodeClosureToListItem.structure_type",
+  "GeometryNodeFieldToGrid.data_type",
+  "GeometryNodeFieldToGridItem.data_type",
+  "GeometryNodeFieldToGridItem.socket_type",
+  "GeometryNodeFieldToListItem.socket_type",
+  "GeometryNodeSampleCurve.data_type",
+  "GeometryNodeSampleIndex.data_type",
+  "GeometryNodeSampleIndex.domain",
+  "GreasePencilBuildModifier.time_mode",
+  "Image.source",
+  "ImageFormatSettings.color_depth",
+  "ImageFormatSettings.color_mode",
+  "ImageFormatSettings.exr_codec",
+  "ImageFormatSettings.file_format",
+  "ImageFormatSettings.media_type",
+  "ImageFormatSettings.views_format",
+  "KeyMapItem.propvalue",
+  "KeyMapItem.type",
+  "NodeClosureInputItem.socket_type",
+  "NodeClosureInputItem.structure_type",
+  "NodeClosureOutputItem.socket_type",
+  "NodeClosureOutputItem.structure_type",
+  "NodeCombineBundleItem.socket_type",
+  "NodeCombineBundleItem.structure_type",
+  "NodeCompositorFileOutputItem.socket_type",
+  "NodeEvaluateClosureInputItem.socket_type",
+  "NodeEvaluateClosureInputItem.structure_type",
+  "NodeEvaluateClosureOutputItem.socket_type",
+  "NodeEvaluateClosureOutputItem.structure_type",
+  "NodeFunctionFormatStringItem.socket_type",
+  "NodeGeometryBakeItem.attribute_domain",
+  "NodeGeometryBakeItem.socket_type",
+  "NodeGeometryCaptureAttributeItem.data_type",
+  "NodeGeometryCaptureAttributeItem.socket_type",
+  "NodeGeometryViewerItem.socket_type",
+  "NodeImplicitConversion.data_type",
+  "NodeRaycastSampleAttributeItem.data_type",
+  "NodeRaycastSampleAttributeItem.socket_type",
+  "NodeSeparateBundleItem.socket_type",
+  "NodeSeparateBundleItem.structure_type",
+  "NodeTree.color_tag",
+  "NodeTreeInterface.new_socket(socket_type)",
+  "NodeTreeInterfaceSocket.attribute_domain",
+  "NodeTreeInterfaceSocket.default_input",
+  "NodeTreeInterfaceSocket.socket_type",
+  "NodeTreeInterfaceSocket.structure_type",
+  "Object.instance_type",
+  "Object.parent_type",
+  "ParticleEdit.tool",
+  "ParticleSettings.display_method",
+  "ParticleSettings.distribution",
+  "ParticleSettings.emit_from",
+  "ParticleSettings.material_slot",
+  "ParticleSettings.render_type",
+  "ParticleSettings.type",
+  "Preferences.active_section",
+  "PreferencesSystem.audio_device",
+  "PreferencesSystem.gpu_backend",
+  "PreferencesSystem.gpu_preferred_device",
+  "PreferencesView.date_format",
+  "PreferencesView.language",
+  "Property.tags",
+  "Region.active_panel_category",
+  "RenderSettings.engine",
+  "RepeatItem.socket_type",
+  "ShaderNodeMix.data_type",
+  "ShrinkwrapConstraint.project_axis_space",
+  "SimulationStateItem.attribute_domain",
+  "SimulationStateItem.socket_type",
+  "SpaceImageEditor.display_channels",
+  "SpaceImageEditor.pivot_point",
+  "SpaceNodeEditor.node_tree_sub_type",
+  "SpaceNodeEditor.tree_type",
+  "SpaceProperties.context",
+  "SpaceSpreadsheet.attribute_domain",
+  "SpaceView3D.stereo_3d_camera",
+  "SpaceView3D.stereo_3d_eye",
+  "TextureSlot.output_node",
+  "TransformOrientationSlot.type",
+  "UnitSettings.length_unit",
+  "UnitSettings.mass_unit",
+  "UnitSettings.temperature_unit",
+  "UnitSettings.time_unit",
+  "UserAssetLibrary.import_method",
+  "View3DShading.render_pass",
+  "View3DShading.studio_light",
+  "View3DShading.type",
+  "WorkSpace.asset_library_reference",
+  "WorkSpaceTool.brush_type",
+  "WorkSpaceTool.mode",
+  "WorkSpaceTool.setup(brush_type)"
+ ],
+ "unresolved": [
+  {
+   "helper": "rna_def_node_socket_interface_float",
+   "props": [
+    "subtype"
+   ]
+  },
+  {
+   "helper": "rna_def_node_socket_interface_int",
+   "props": [
+    "subtype"
+   ]
+  },
+  {
+   "helper": "rna_def_node_socket_interface_vector",
+   "props": [
+    "subtype"
+   ]
+  },
+  {
+   "helper": "rna_def_node_socket_interface_int_vector",
+   "props": [
+    "subtype"
+   ]
+  },
+  {
+   "helper": "rna_def_node_socket_interface_string",
+   "props": [
+    "subtype"
+   ]
+  },
+  {
+   "helper": "rna_def_node_socket_menu",
+   "props": [
+    "default_value"
+   ]
+  },
+  {
+   "helper": "rna_def_node_socket_interface_menu",
+   "props": [
+    "default_value"
+   ]
+  },
+  {
+   "helper": "def_node_image_user",
+   "props": [
+    "layer",
+    "view"
+   ]
+  }
+ ]
+}

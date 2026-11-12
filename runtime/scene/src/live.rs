@@ -25,8 +25,9 @@ pub struct LiveScene {
     pub(crate) cam: BTreeMap<String, V>,
     /// frame 0 was stepped when play opened (live.rs), and nothing since
     pub warm: bool,
-    /// identity -> a panel's `src` as written when the full path last made its row (the fast path leaves it a new one)
-    pub(crate) panel_srcs: std::collections::HashMap<String, String>,
+    /// identity -> a panel's `src`, or an <Instances>' placements (its shared data-at), as the full path last made its row
+    /// (the fast path leaves it a new one)
+    pub(crate) panel_srcs: std::collections::HashMap<String, std::sync::Arc<str>>,
     /// what the lights' sets were made from when the full path last made them (light_sig): the fast path, which
     /// doesn't make them, goes the full way when it differs
     pub(crate) light_sig: String,
@@ -61,8 +62,8 @@ pub(crate) const MORPH_COLS: [&str; 64] = ["morph0", "morph1", "morph2", "morph3
 pub(crate) fn live_dynamic(kind: &str) -> &'static [&'static str] {
     match kind {
         "light" => &["lux", "lumens", "x", "y", "z", "dir_x", "dir_y", "dir_z", "rot_qx", "rot_qy", "rot_qz", "rot_qw", "inner", "outer", "frame_sets", "frame_set_i"],
-        "mesh" => &["x", "y", "z", "q_x", "q_y", "q_z", "q_w", "scale_x", "scale_y", "scale_z", "visible", "col_r", "col_g", "col_b", "rough", "metal", "emissive_k", "opacity", "sh_r", "sh_g", "sh_b", "rim_k", "spec_k", "outline_w", "pass"],
-        "model" => &["x", "y", "z", "q_x", "q_y", "q_z", "q_w", "scale_x", "scale_y", "scale_z", "visible", "anim_t", "mix0_t", "mix0_w", "mix1_t", "mix1_w", "mix2_t", "mix2_w", "mix3_t", "mix3_w", "morph0", "morph1", "morph2", "morph3", "morph4", "morph5", "morph6", "morph7", "morph8", "morph9", "morph10", "morph11", "morph12", "morph13", "morph14", "morph15", "morph16", "morph17", "morph18", "morph19", "morph20", "morph21", "morph22", "morph23", "morph24", "morph25", "morph26", "morph27", "morph28", "morph29", "morph30", "morph31", "morph32", "morph33", "morph34", "morph35", "morph36", "morph37", "morph38", "morph39", "morph40", "morph41", "morph42", "morph43", "morph44", "morph45", "morph46", "morph47", "morph48", "morph49", "morph50", "morph51", "morph52", "morph53", "morph54", "morph55", "morph56", "morph57", "morph58", "morph59", "morph60", "morph61", "morph62", "morph63", "g0_w", "g0_t", "g1_w", "g1_t", "g2_w", "g2_t", "g3_w", "g3_t", "g4_w", "g4_t", "g5_w", "g5_t", "g6_w", "g6_t", "g7_w", "g7_t", "g8_w", "g8_t", "g9_w", "g9_t", "g10_w", "g10_t", "g11_w", "g11_t", "g12_w", "g12_t", "g13_w", "g13_t", "g14_w", "g14_t", "g15_w", "g15_t", "look", "glitch_explode", "glitch_scramble", "glitch_jitter", "glitch_snap", "glitch_smear_x", "glitch_smear_y", "glitch_smear_z", "glitch_seed", "cloth_frame", "screen_power", "pass"],
+        "mesh" => &["x", "y", "z", "q_x", "q_y", "q_z", "q_w", "scale_x", "scale_y", "scale_z", "visible", "col_r", "col_g", "col_b", "rough", "metal", "emissive_k", "opacity", "sh_r", "sh_g", "sh_b", "rim_k", "spec_k", "outline_w", "pass", "inst"],
+        "model" => &["x", "y", "z", "q_x", "q_y", "q_z", "q_w", "scale_x", "scale_y", "scale_z", "visible", "anim_t", "mix0_t", "mix0_w", "mix1_t", "mix1_w", "mix2_t", "mix2_w", "mix3_t", "mix3_w", "morph0", "morph1", "morph2", "morph3", "morph4", "morph5", "morph6", "morph7", "morph8", "morph9", "morph10", "morph11", "morph12", "morph13", "morph14", "morph15", "morph16", "morph17", "morph18", "morph19", "morph20", "morph21", "morph22", "morph23", "morph24", "morph25", "morph26", "morph27", "morph28", "morph29", "morph30", "morph31", "morph32", "morph33", "morph34", "morph35", "morph36", "morph37", "morph38", "morph39", "morph40", "morph41", "morph42", "morph43", "morph44", "morph45", "morph46", "morph47", "morph48", "morph49", "morph50", "morph51", "morph52", "morph53", "morph54", "morph55", "morph56", "morph57", "morph58", "morph59", "morph60", "morph61", "morph62", "morph63", "g0_w", "g0_t", "g1_w", "g1_t", "g2_w", "g2_t", "g3_w", "g3_t", "g4_w", "g4_t", "g5_w", "g5_t", "g6_w", "g6_t", "g7_w", "g7_t", "g8_w", "g8_t", "g9_w", "g9_t", "g10_w", "g10_t", "g11_w", "g11_t", "g12_w", "g12_t", "g13_w", "g13_t", "g14_w", "g14_t", "g15_w", "g15_t", "look", "glitch_explode", "glitch_scramble", "glitch_jitter", "glitch_snap", "glitch_smear_x", "glitch_smear_y", "glitch_smear_z", "glitch_seed", "cloth_frame", "screen_power", "pass", "inst"],
         "panel" => &["x", "y", "z", "q_x", "q_y", "q_z", "q_w", "scale_x", "scale_y", "scale_z", "visible", "screen_power", "screen_bright", "pass", "sheet_frame", "sheet_cols", "sheet_rows", "src"],
         "decal" => &["x", "y", "z", "q_x", "q_y", "q_z", "q_w", "scale_x", "scale_y", "scale_z", "visible", "col_r", "col_g", "col_b", "opacity", "rough", "metal"],
         _ => &[],
@@ -122,10 +123,11 @@ impl LiveScene {
     /// What the camera row changes, of the columns a render keys (cam_keyed): the camera's tuple, or None.
     pub(crate) fn camera_diff(sent: &mut BTreeMap<String, V>, cam: &BTreeMap<String, V>) -> Option<raea_core_program::eval::Tup> {
         let mut vals = BTreeMap::new();
-        // and each frame's post-processing table and page background (RR1: render = play)
-        let keyed = |k: &str| cam_keyed(k) || matches!(k, "frame_sets" | "frame_set_i" | "bg_r" | "bg_g" | "bg_b" | "bg_a");
-        for k in cam.keys().map(String::as_str).filter(|k| keyed(k)).chain(["ambient"]) {
-            let v = cam.get(k).cloned().or_else(|| (k == "ambient" && sent.contains_key("ambient")).then_some(V::N(0.0)));
+        // and each frame's post-processing table and page background (RR1: render = play), and its shot (RR2)
+        let keyed = |k: &str| cam_keyed(k) || matches!(k, "frame_sets" | "frame_set_i" | "bg_r" | "bg_g" | "bg_b" | "bg_a" | "shot");
+        // the ambient and the shot back to 0 when the row stops holding them (no light; the first camera's shot again)
+        for k in cam.keys().map(String::as_str).filter(|k| keyed(k)).chain(["ambient", "shot"]) {
+            let v = cam.get(k).cloned().or_else(|| (matches!(k, "ambient" | "shot") && sent.contains_key(k)).then_some(V::N(0.0)));
             if let Some(v) = v {
                 if sent.get(k) != Some(&v) {
                     sent.insert(k.into(), v.clone());
@@ -147,7 +149,10 @@ impl LiveScene {
         let tr = Tracks::of(&all);
         rows_into_of(&all, &tr, &mut p);
         for (key, src) in tr.panels.iter().filter_map(|(k, t)| Some((k, t[0].as_ref()?.props.get("src")?.as_str()?))) {
-            self.panel_srcs.insert(key.clone(), src.to_string());
+            self.panel_srcs.insert(key.clone(), src.into());
+        }
+        for (key, at) in tr.meshes.iter().chain(&tr.models).filter_map(|(k, t)| Some((k, t[0].as_ref()?.at.clone()?))) {
+            self.panel_srcs.insert(key.clone(), at);
         }
         // each local row (this frame's tracks, numbered as rows_into numbers them) by its identity
         let mut local: std::collections::HashMap<String, &String> = std::collections::HashMap::new();
@@ -310,12 +315,14 @@ impl LiveScene {
                         }
                     }
                 }
-                // the emissive strength only where the first frame glows (a render's column), opacity once it's been
-                // see-through, scale back to 1: what a render's keyed column says on a frame this one leaves it out
-                if !r.first.contains_key("emissive") {
-                    want.remove("emissive_k");
-                } else {
-                    want.entry("emissive_k".into()).or_insert(V::N(1.0));
+                // the emissive colour the frame it differs from what was sent (none is black), with its strength (0 once black:
+                // #106, a video kept the first frame's); else the strength only where the sent colour glows (a render's column)
+                let black = || V::S("#000000".into());
+                let (em, was) = (row.get("emissive").cloned().unwrap_or_else(black), r.sent.get("emissive").cloned().unwrap_or_else(black));
+                match em {
+                    _ if em != was => drop((want.insert("emissive".into(), em), want.entry("emissive_k".into()).or_insert(V::N(0.0)))),
+                    _ if em == black() => drop(want.remove("emissive_k")),
+                    _ => drop(want.entry("emissive_k".into()).or_insert(V::N(1.0))),
                 }
             }
             if matches!(kind.as_str(), "mesh" | "glyph") && r.sent.contains_key("opacity") {
@@ -383,7 +390,7 @@ mod tests {
     use serde_json::json;
 
     fn model(props: Value) -> Node3 {
-        Node3 { kind: "Model".into(), props: std::sync::Arc::new(props.as_object().unwrap().clone()), shape: None, kids: Vec::new().into() }
+        Node3 { kind: "Model".into(), props: std::sync::Arc::new(props.as_object().unwrap().clone()), shape: None, at: None, kids: Vec::new().into() }
     }
 
     fn person(who: &str) -> Vec<Node3> {
@@ -407,10 +414,23 @@ mod tests {
     /// A glyph faded in (`reveal`: 0, 0.5, 1) is opaque once done, not left at its last fade (#38: bevy/text3d's tag).
     #[test]
     fn a_faded_glyph_is_opaque_once_done() {
-        let text = |o: f64| vec![Node3 { kind: "RichText".into(), props: std::sync::Arc::new(json!({"spans": [{"t": "a"}], "glyphs": [{"at": 0, "span": 0, "ch": "a", "o": o}]}).as_object().unwrap().clone()), shape: None, kids: Vec::new().into() }];
+        let text = |o: f64| vec![Node3 { kind: "RichText".into(), props: std::sync::Arc::new(json!({"spans": [{"t": "a"}], "glyphs": [{"at": 0, "span": 0, "ch": "a", "o": o}]}).as_object().unwrap().clone()), shape: None, at: None, kids: Vec::new().into() }];
         let mut ls = LiveScene::default();
         ls.open(Shot { scene: &text(0.5), clear: None }, 64, 64, 30.0);
         let (set, _) = ls.frame(Shot { scene: &text(1.0), clear: None });
         assert_eq!(set.iter().find(|t| t.kind == "glyph").and_then(|t| t.vals.get("opacity")), Some(&V::N(1.0)));
+    }
+
+    /// Two cameras cut between (<Camera3d is_active>): the camera row's shot is sent the frame it changes, and 0 when
+    /// the first camera is back, so a live engine draws both frames as cuts (RR2, Engine::set_rows).
+    #[test]
+    fn a_cut_back_sends_the_first_shot() {
+        let cams = |on: usize| -> Vec<Node3> { (0..2).map(|i| Node3 { kind: "PerspectiveCamera".into(), props: std::sync::Arc::new(json!({"position": [i, 1, 5], "active": i == on}).as_object().unwrap().clone()), shape: None, at: None, kids: Vec::new().into() }).collect() };
+        let shot = |set: &[raea_core_program::eval::Tup]| set.iter().find(|t| t.kind == "camera").and_then(|t| t.vals.get("shot").cloned());
+        let mut ls = LiveScene::default();
+        ls.open(Shot { scene: &cams(0), clear: None }, 64, 64, 30.0);
+        assert_eq!(shot(&ls.frame(Shot { scene: &cams(1), clear: None }).0), Some(V::N(1.0)));
+        assert_eq!(shot(&ls.frame(Shot { scene: &cams(1), clear: None }).0), None);
+        assert_eq!(shot(&ls.frame(Shot { scene: &cams(0), clear: None }).0), Some(V::N(0.0)));
     }
 }

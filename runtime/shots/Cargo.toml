@@ -1,0 +1,17 @@
+[package]
+name = "raea-runtime-shots"
+version = "0.1.0"
+edition = "2024"
+license = "FSL-1.1-ALv2"
+publish = false
+description = "<BlenderShot> and <GodotShot> as native calls: a shot's frames made once by `raea blender|godot shot` and kept in the composition's asset store"
+
+[dependencies]
+# the native-call registry, and the composition's folder the shot's paths are read from
+raea-native = { path = "../../engine/native", default-features = false }
+raea-runtime-calls = { path = "../calls" }
+# the composition's asset store, where the frames are kept
+raea-io-assets = { path = "../../io/assets" }
+# the bake's progress while another engine draws the frames
+raea-sys-bake = { path = "../../systems/bake" }
+serde_json = "1"

@@ -24,7 +24,7 @@
 
 <p align="center">
   <img alt="licence FSL-1.1-ALv2" src="https://img.shields.io/badge/licence-FSL--1.1--ALv2-black">
-  <img alt="status canary" src="https://img.shields.io/badge/status-canary-black">
+  <img alt="latest release" src="https://img.shields.io/github/v/release/shinyobjectz/raea?label=release&color=black">
   <img alt="macOS, Apple Silicon" src="https://img.shields.io/badge/macOS-Apple%20Silicon-black">
   <img alt="Linux x86_64" src="https://img.shields.io/badge/Linux-x86__64-black">
   <img alt="Windows x86_64" src="https://img.shields.io/badge/Windows-x86__64-black">
@@ -32,8 +32,14 @@
 
 ---
 
-> **Canary.** raea changes daily. Releases run on macOS (Apple Silicon), Linux (x86_64) and, new and least tested,
-> Windows (x86_64). Expect breaking changes, rough edges and gaps in the docs.
+> **v0.1.1** is raea's first full release: the engine and, for the first time, the desktop app, on macOS (Apple
+> Silicon), Linux (x86_64) and, newest and least tested, Windows (x86_64). raea is young: expect rough edges and gaps
+> in the docs.
+
+## The app
+
+The raea app is where you make video and games with your AI. Download it from [raea.io](https://raea.io) for the Mac,
+Windows or Linux. It tells you when a new version is out; on the Mac it updates itself.
 
 ## Install
 

@@ -407,4 +407,29 @@ describe("video and audio play on the host's player (runtime/dom media.rs, raea-
     flush();
     expect(host.nodes.get(id)!.props.__muted).toBe(false);
   });
+
+  test("volume reaches the host's player as __volume, fires volumechange, and is told again with a play", () => {
+    const host = fresh();
+    let v: any;
+    const seen: string[] = [];
+    function App() {
+      const r = useRef<any>(null);
+      useEffect(() => void (v = r.current), []);
+      return <video ref={r} data-testid="v" src="/media/renders/film.mp4" onVolumeChange={(e: any) => seen.push(`${e.type}:${e.currentTarget.volume}`)} />;
+    }
+    mount(<App />, 0, { dom: true });
+    const id = host.tid("v");
+    const prop = (k: string) => (flush(), host.nodes.get(id)!.props[k]);
+    expect(v.volume).toBe(1);
+    expect(prop("__volume")).toBeUndefined();
+    v.volume = 0.4;
+    expect(v.volume).toBe(0.4);
+    expect(prop("__volume")).toBe(0.4);
+    v.volume = 0.4;
+    expect(() => (v.volume = 1.5)).toThrow(RangeError);
+    expect(v.volume).toBe(0.4);
+    v.play();
+    expect(prop("__volume")).toBe(0.4);
+    expect(seen).toEqual(["volumechange:0.4"]);
+  });
 });

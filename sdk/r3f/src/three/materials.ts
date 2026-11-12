@@ -80,6 +80,9 @@ export function paint(m: THREE.Material, p: Props, over = false) {
     if (have instanceof THREE.Color && typeof v === "string") have.set(v);
     else if ((typeof v === "number" || typeof v === "boolean") && (typeof have === "number" || typeof have === "boolean")) target[k] = v;
   }
+  // a Bevy StandardMaterial's emissive strength (bevy3d materials.tsx: `emissive_nits`, as the engine draws it,
+  // core/scene emissive_power): in three's units already, since a StandardMaterial's emissive skips the camera exposure
+  if (typeof p.emissive_nits === "number" && typeof target.emissiveIntensity === "number") target.emissiveIntensity = p.emissive_nits;
   for (const [from, to, colour] of MAPS) {
     if (!(to in target) || (over && !(from in p))) continue;
     const src = p[from];

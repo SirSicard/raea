@@ -1,0 +1,44 @@
+# raea cloud on Fly Machines (docs/cloud.feature CL10): one Machine with a volume for the home folder, stopped when
+# it's idle and started again by the next request. From sdk/cloud (the image is built from image/Dockerfile):
+#
+#   fly apps create YOUR-APP                                        # and set app below to it
+#   fly volumes create raea_home --size 20 --region iad -c deploy/fly.toml
+#   fly secrets set RAEA_CLOUD_TOKEN=$(openssl rand -hex 32) -c deploy/fly.toml
+#   fly deploy -c deploy/fly.toml --dockerfile image/Dockerfile .
+#
+# Agents that take a key get it as a secret too (fly secrets set ANTHROPIC_API_KEY=...). Kimi Code signs in once
+# through POST /v1/login, and the volume keeps the sign-in.
+app = "raea-cloud"
+primary_region = "iad"
+
+[build]
+  [build.args]
+    RAEA_VERSION = "0.1.1"
+    AGENTS = "kimi-code"
+
+[env]
+  RAEA_AGENT = "kimi-code"
+
+[[mounts]]
+  source = "raea_home"
+  destination = "/home/raea"
+  initial_size = "20gb"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+# raea renders on the CPU here (Mesa's llvmpipe): more cores render faster
+[[vm]]
+  size = "performance-4x"
+  memory = "8gb"

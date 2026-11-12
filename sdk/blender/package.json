@@ -1,0 +1,17 @@
+{
+  "name": "@raea/blender",
+  "license": "FSL-1.1-ALv2",
+  "private": true,
+  "version": "0.1.1",
+  "description": "Blender's Python API from TypeScript (docs/blender.feature): bpy, bmesh, mathutils, bpy_extras and gpu, typed from Blender's own API (tools/gen.sh), run in a headless Blender, the person's own (live), or the one `raea blender run` starts. mathutils is computed locally with Blender's maths.",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./mathutils": "./src/mathutils/index.ts",
+    "./types": "./src/types.ts",
+    "./shot": "./src/shot.tsx",
+    "./shoot": "./src/shoot.ts"
+  },
+  "files": ["src", "python", "tools", "README.md"]
+}

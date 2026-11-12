@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 license = "FSL-1.1-ALv2"
 publish = false
-description = "raea's desktop window around a page: its chrome (--chrome inset: the page under a transparent title bar, window.drag and window.zoom) and what a Mac app does that a page can't (the clipboard, links, notifications, the dock badge, raea:// links)"
+description = "raea's desktop window around a page: its chrome (--chrome inset: the page under a transparent title bar, window.drag and window.zoom) and what a desktop app does that a page can't (the clipboard, links, notifications, the Dock badge or taskbar overlay, raea:// links)"
 
 [features]
 # on screen (raea-page-host's --window): AppKit's calls are made; without it they are recorded and answered
-window = ["bevy/bevy_winit", "dep:objc2", "dep:objc2-app-kit", "dep:objc2-foundation", "dep:raw-window-handle", "dep:block2"]
+window = ["bevy/bevy_winit", "dep:objc2", "dep:objc2-app-kit", "dep:objc2-foundation", "dep:raw-window-handle", "dep:block2", "dep:windows"]
 
 [dependencies]
 bevy = { version = "=0.20.0", default-features = false, features = ["std", "bevy_window"] }
@@ -23,3 +23,8 @@ objc2-foundation = { version = "0.3", optional = true, default-features = false,
 raw-window-handle = { version = "0.6", optional = true }
 # completion handlers for notifications
 block2 = { version = "0.6", optional = true }
+
+# native.rs dock.badge on Windows: the taskbar button's overlay icon (win.rs)
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", optional = true, features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+raw-window-handle = { version = "0.6", optional = true }

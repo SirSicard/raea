@@ -29,6 +29,15 @@
 - Publishing is the person's. The app's Publish view sends a post to a network, now or at a time, after checking it
   against that network's guidelines; nothing goes out until they press Publish or Schedule. Have the file, its tags
   and, when asked, a caption within the network's limit ready for them.
+- When the person finishes the cut in an editor, hand it over in layers: `raea export capcut EDIT.tsx` writes the
+  composition as a CapCut draft, its footage and sounds as clips of their own files at their trims and gains and
+  everything raea draws as transparent clips over them, entered in CapCut's project list (CapCut must be closed;
+  `-o DIR` writes the draft folder anywhere). In the raea app it's Export to, then CapCut, on the render's card, or To
+  CapCut on its page. Pass on what the export notes: a clip that moves or fades within its shot lands as its first
+  frame shows it, and a Tone graph's music has no file to place.
+- Graphics for someone else's edit (a lower third, a title, a logo sting) go out as a transparent movie:
+  `raea render gfx.tsx -o out/lower-third.mov --alpha` (ProRes 4444 on a Mac, QuickTime Animation elsewhere;
+  `--alpha-codec hevc` for a far smaller file, on a Mac). Draw nothing behind them: no full-frame fill, no background.
 - When the deliverable isn't a video: a game as its own program is `raea export-game` (`games`), an app is
   `raea app bundle` signed with the person's own identity (`apps`), and a live composition for another raea is
   `raea bundle --composition-bundle`.
@@ -39,7 +48,8 @@ Every network shows a video inside its own interface, and a frame made for one s
 its hook in another. The numbers that decide this (shapes, lengths, file sizes, caption limits, where the buttons sit)
 are the app's own publishing guidelines, generated into reference/platforms.md, so a delivery made to them is one
 Publish accepts without a fix. Tags with the same keys across a project are what make the Table a delivery list
-rather than a pile of files.
+rather than a pile of files. An editor finishing the cut needs layers, not a flattened picture: a draft with the
+footage as clips and raea's drawing over them keeps every cut and title editable, where an .mp4 bakes them in.
 
 ## Common mistakes
 
@@ -52,6 +62,9 @@ rather than a pile of files.
 - `final-v2-FINAL.mp4`, `Launch Video (1).mp4`, or a new render written over the version the person last saw.
 - Tags that change keys between items (`tiktok`, `platform:TikTok`, `network:tiktok`): the Table makes three columns.
 - Posting to a network, or asking the person for their password to. Publishing is the person's, from Publish.
+- A transparent movie with a full-frame background, which covers the footage it's laid on; or `--alpha` with an
+  .mp4, which holds no alpha (raea refuses it: use .mov).
+- Exporting to CapCut while CapCut is open. It rewrites its project list when it quits, so raea refuses: quit it first.
 
 ## Example: one piece in the three shapes it ships in
 

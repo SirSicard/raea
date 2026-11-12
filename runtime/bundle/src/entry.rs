@@ -4,6 +4,7 @@ pub fn entry(file: &str, o: &CompOpts) -> String {
     let (comp, w, h, fps, frames) = (o.composition.as_deref(), o.w, o.h, o.fps, o.frames);
     let js = |v: &Option<Value>| v.as_ref().map(Value::to_string).unwrap_or("null".into());
     let (words, perception, input) = (js(&o.words), js(&o.perception), js(&o.input));
+    let given = serde_json::to_string(&o.given).unwrap_or("[]".into());
     // the composition's element made once, so a frame re-renders only what reads the frame (its clock, through
     // useCurrentFrame), not every part (docs/control.feature FC1b). A frame is already pure (a still renders any
     // frame alone), so a part drawing Math.random or Date in render without reading the frame breaks either way.
@@ -26,6 +27,7 @@ if (!C) throw new Error("{file} exports no component and registers no compositio
 const MC: any = (M as any).config ?? {{}};
 const pos = (v: any, d: number) => (typeof v === "number" && v > 0 ? v : d);
 const cfg = reg ?? {{ id: "main", width: pos(MC.width, {w}), height: pos(MC.height, {h}), fps: pos(MC.fps, {fps}), durationInFrames: pos(MC.durationInFrames, {frames}), defaultProps: {{}} }};
+for (const [k, key, v] of {given} as [string, string, number][]) if ((cfg as any)[key] !== v) console.warn(`NOT APPLIED  ${{k}} ${{v}}: the composition says its ${{key}} is ${{(cfg as any)[key]}}; ${{k}} only sizes a file with no <Composition> or config`);
 // the Clock's words (frames {{text, from, to}}, or seconds {{text, start, end}} / {{text, start_ms, end_ms}}), perception
 // (one for every frame, or by frame: the latest at or before it) and input (a timeline, or inputs.rrl's step keys)
 const RAW_WORDS: any[] | null = {words};

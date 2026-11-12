@@ -7,11 +7,12 @@
 //            across. It fades out as it shrinks below a pixel, so a wide shot shows smooth skin rather than shimmering
 //            grain, and the skin goes a little rougher as it does (the shine it broke up spreads: Activision's
 //            "Next-Gen Character Rendering", GDC 2013). How strongly it shows by region comes from the body's
-//            skin_mask.png (psx fit.py: none on the lips).
+//            skin_mask.png (psx fit.py: none on the lips). The same tile's height shades the colour, a crease or pore
+//            darker, as the photo's colour is a blur up close.
 //   lit      light scattered under the skin: each directional light's diffuse redone with a softer falloff, wider for
 //            red than green, wider than blue, and with red shaded from the mesh's smooth normal rather than the fine relief's
-//            (pre-integrated skin, Penner and Borshukov, GPU Pro 2, 2011, without its lookup table: a wrap per channel,
-//            widened where the surface curves fast, at the nose, lips and ears), and red reaching further into a
+//            (pre-integrated skin, Penner and Borshukov, GPU Pro 2, 2011, without its lookup table: a wrap per channel),
+//            and red reaching further into a
 //            shadow's soft edge. It adds the difference to Bevy's own diffuse, light by light, under the same shadow.
 // The second, tighter shine of oily skin is the material's clearcoat (Bevy's own layer), set by <Character skin>.
 export const SKIN_WESL = /* wgsl */ `
@@ -23,7 +24,14 @@ fn skin_stored(c: vec3<f32>) -> vec3<f32> {
 }
 
 fn surface(in: VertexOutput, pbr: ptr<function, PbrInput>) {
-  let p = in.uv * u_micro().x;                         // the tile's coordinates (unwrapped)
+@if(SKIN_MASK)
+  let mk = skin_stored(textureSample(tex_mask, samp_mask, in.uv).rgb);
+@else
+  let mk = vec3<f32>(1.0, 0.0, 0.0);
+  // the texture's scale here against MakeHuman's layout (skin_mask.png's green, over 8: psx gives the face's island half
+  // the texture), so the tile keeps its size on the skin; 0 (older bodies) is 1
+  let uvs = select(mk.g * 8.0, 1.0, mk.g < 0.01);
+  let p = in.uv * u_micro().x / uvs;                   // the tile's coordinates (unwrapped)
   // (derivatives first, in uniform control flow)
   let dp1 = dpdx(in.world_position.xyz);
   let dp2 = dpdy(in.world_position.xyz);
@@ -33,16 +41,15 @@ fn surface(in: VertexOutput, pbr: ptr<function, PbrInput>) {
   let dq2 = dpdy(p);
   let across = length(fwidth(p)) * u_micro().z;        // the tile's features per pixel
   let fade = 1.0 - smoothstep(u_fade().x, u_fade().y, across);
-@if(SKIN_MASK)
-  let strength = skin_stored(textureSample(tex_mask, samp_mask, in.uv).rgb).r;
-@else
-  let strength = 1.0;
+  let strength = mk.r;
 @if(SKIN_DETAIL)
   let dtex = skin_stored(textureSample(tex_detail, samp_detail, in.uv).rgb) * 2.0 - 1.0;
   // (the shader's textures share one sampler, which clamps: the tile wraps by fract, its mip level kept from the
   // unwrapped coordinates' derivatives, so no seam line where it wraps)
 @if(SKIN_MICRO)
-  let mtex = skin_stored(textureSampleGrad(tex_micro, samp_micro, fract(p), dq1, dq2).rgb) * 2.0 - 1.0;
+  let msamp = textureSampleGrad(tex_micro, samp_micro, fract(p), dq1, dq2);
+  let mtex = skin_stored(msamp.rgb) * 2.0 - 1.0;
+  let grain = msamp.a * 2.0 - 1.0;                      // (alpha is never colour-decoded)
   var N = normalize((*pbr).N);
   // the directions in which u and v grow on the surface (Schuler, "Normal Mapping Without Precomputed Tangents"),
   // signed by the screen's handedness: his frame is GLSL's, whose y runs up the screen; WGSL's dpdy runs down, which
@@ -65,6 +72,9 @@ fn surface(in: VertexOutput, pbr: ptr<function, PbrInput>) {
     // and gone as it shrinks below a pixel; the skin a little rougher as it goes (the shine it broke up spreads)
     let k = u_micro().y * strength * fade;
     N = normalize(N + k * (mtex.x * Tu + mtex.y * Bu));
+    // and its colour: darker in the creases and pores, green and blue more than red (the blood under them shows: a
+    // grey darkening read as dust), as the photo's colour is a blur up close
+    (*pbr).material.base_color = vec4<f32>((*pbr).material.base_color.rgb * (1.0 + u_grain() * grain * strength * fade * vec3<f32>(0.55, 1.0, 1.15)), (*pbr).material.base_color.a);
     (*pbr).material.perceptual_roughness = clamp((*pbr).material.perceptual_roughness + u_fade().z * (1.0 - fade) * strength, 0.0, 1.0);
   }
   (*pbr).N = N;
@@ -73,13 +83,13 @@ fn surface(in: VertexOutput, pbr: ptr<function, PbrInput>) {
 fn lit(in: VertexOutput, pbr: PbrInput, color: vec4<f32>) -> vec4<f32> {
   let Nd = normalize(pbr.N);              // the fine relief's normal: blue's, and Bevy's own diffuse
   let Ns = normalize(pbr.world_normal);   // the mesh's smooth one: red's mostly
-  // how fast the surface curves, per metre (a centimetre's radius is 100), scaled: the nose, lips and ears scatter more
-  let curve = clamp(length(fwidth(Ns)) / max(length(fwidth(pbr.world_position.xyz)), 1e-6) * u_curve(), 0.0, 1.0);
   let lights = &bevy_pbr::render::mesh_view_bindings::lights;
   let n = (*lights).n_directional_lights;
   if (n == 0u) { return color; }
   let base = pbr.material.base_color.rgb * (1.0 - pbr.material.metallic) * (1.0 - pbr.material.diffuse_transmission);
-  let w = u_scatter() * mix(0.6, 1.6, curve);
+  // (one width everywhere: widened by the curvature fwidth measured, it changed from triangle to triangle, the normal's
+  // derivative being constant across each, and drew the head's facets as bands of orange at the light's edge)
+  let w = u_scatter();
   let Nr = normalize(mix(Nd, Ns, u_soft().x));
   let Ng = normalize(mix(Nd, Ns, u_soft().y));
   let Nb = normalize(mix(Nd, Ns, u_soft().z));
@@ -112,13 +122,15 @@ fn lit(in: VertexOutput, pbr: PbrInput, color: vec4<f32>) -> vec4<f32> {
 
 /** the skin look's settings. micro: the fine relief tile (skin_micro.png) [repeats per UV unit (psx bodies: about 1.2 m
  * of face to a unit, so 46 is the tile's 25 mm), how far it tilts the normal, its features across the tile (for the
- * fade)]; detail: how strongly the photo's surface detail (skin_detail.png) tilts the normal (1 as baked); fade: [the
+ * fade)]; detail: how strongly the photo's surface detail (skin_detail.png) tilts the normal (1 as baked; 0.3, as at full strength its
+ * soft folds caught the light in streaks and the face looked fried); fade: [the
  * relief's features per pixel where it starts to fade, where it's gone, the roughness added as it goes]; scatter: how
  * far each of red, green and blue wraps past the light's edge; soft: how much of the mesh's smooth normal each of red,
  * green and blue is shaded from (1 all, 0 the fine relief's); shadow: each colour's falloff into a soft shadow's edge
- * (below 1 reaches further); curve: how much the surface's curvature (per metre) widens the scatter */
-export interface SkinLook { micro: [number, number, number]; detail: number; fade: [number, number, number]; scatter: [number, number, number]; band: number; soft: [number, number, number]; shadow: [number, number, number]; curve: number }
-export const SKIN_LOOK: SkinLook = { micro: [46, 0.5, 40], detail: 1, fade: [0.2, 0.55, 0.06], scatter: [0.35, 0.14, 0.07], band: 0.3, soft: [0.85, 0.45, 0.1], shadow: [0.8, 0.95, 1.0], curve: 0.008 };
+ * (below 1 reaches further); grain: how much the fine relief's height (skin_micro.png's alpha) shades the colour, a
+ * crease or pore darker */
+export interface SkinLook { micro: [number, number, number]; detail: number; fade: [number, number, number]; scatter: [number, number, number]; band: number; soft: [number, number, number]; shadow: [number, number, number]; grain: number }
+export const SKIN_LOOK: SkinLook = { micro: [46, 0.5, 40], detail: 0.3, fade: [0.2, 0.55, 0.06], scatter: [0.35, 0.14, 0.07], band: 0.18, soft: [0.85, 0.45, 0.1], shadow: [0.9, 0.97, 1.0], grain: 0.4 };
 
 /** the skin's material settings beside the shader: the second shine (clearcoat, smooth, over the fine relief's base layer),
  * the base layer's reflectance (skin's F0 about 0.028) */

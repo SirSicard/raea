@@ -1,0 +1,73 @@
+# raea cloud on Kubernetes (docs/cloud.feature CL10): a Secret for the token, a PersistentVolumeClaim for the home
+# folder, one Deployment and a Service. Push the image to a registry your cluster pulls from, set it below, then:
+#
+#   kubectl create secret generic raea-cloud --from-literal=RAEA_CLOUD_TOKEN=$(openssl rand -hex 32)
+#   kubectl apply -f deploy/k8s.yaml
+#   kubectl port-forward svc/raea-cloud 8080:8080        # or put an Ingress in front of the Service
+#
+# Agents' keys go in the same Secret (--from-literal=ANTHROPIC_API_KEY=...). This server renders on its CPU; to render
+# on a GPU, add deploy/k8s.gpu.yaml: a GPU worker this one hands its renders to (CL15), or give this Deployment the GPU
+# itself with `nvidia.com/gpu: 1` under limits (CL13).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: raea-cloud-home
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: raea-cloud
+  labels: { app: raea-cloud }
+spec:
+  replicas: 1
+  # one home folder, one writer: the old pod goes before the new one starts
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: raea-cloud }
+  template:
+    metadata:
+      labels: { app: raea-cloud }
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: raea
+          image: ghcr.io/YOUR-ORG/raea-cloud:0.1.1
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef: { name: raea-cloud }
+          env:
+            - { name: RAEA_AGENT, value: kimi-code }
+            # with deploy/k8s.gpu.yaml applied, renders go to the GPU worker:
+            # - { name: RAEA_CLOUD_GPU_URL, value: "http://raea-cloud-gpu:8080" }
+            # - name: RAEA_CLOUD_GPU_TOKEN
+            #   valueFrom: { secretKeyRef: { name: raea-cloud-gpu, key: RAEA_CLOUD_TOKEN } }
+          volumeMounts:
+            - { name: home, mountPath: /home/raea }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "2", memory: 4Gi }
+            limits: { memory: 8Gi }
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: home
+          persistentVolumeClaim: { claimName: raea-cloud-home }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: raea-cloud
+spec:
+  selector: { app: raea-cloud }
+  ports:
+    - { port: 8080, targetPort: 8080 }

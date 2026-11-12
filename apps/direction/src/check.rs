@@ -35,10 +35,17 @@ pub fn taste_dir() -> Option<PathBuf> {
     std::env::var_os("RAEA_TASTE").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".raea/taste")))
 }
 
-/// The .ts files `--taste` names: the file, or every .ts in the folder.
+/// The .ts files `--taste` names: the file, or every .ts in the folder. A file named under the person's taste folder
+/// that isn't there yet is a note, not a refusal: the skill prescribes --taste on that folder's own taste file, and a
+/// machine with none yet should still check (#89); any other missing path is left to the reader to refuse.
 pub fn taste_files(args: &[String]) -> Vec<PathBuf> {
     let Some(t) = flag(args, "--taste").map(PathBuf::from) else { return vec![] };
     if t.extension().is_some_and(|x| x == "ts") {
+        let home = taste_dir().map(std::path::absolute).and_then(Result::ok);
+        if !t.is_file() && t.parent().map(std::path::absolute).and_then(Result::ok) == home {
+            eprintln!("note: no taste yet ({} isn't there); checking without it", t.display());
+            return vec![];
+        }
         return vec![t];
     }
     let mut v: Vec<PathBuf> = std::fs::read_dir(&t).into_iter().flatten().filter_map(|e| e.ok().map(|e| e.path())).filter(|f| f.extension().is_some_and(|x| x == "ts")).collect();

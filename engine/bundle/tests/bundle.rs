@@ -104,9 +104,12 @@ fn bundles_a_script_with_the_engines_resolution() {
     w("js/shims/node/zlib.ts", "export const gzip = () => 'ZLIB_SHIM';\n");
     w("js/node_modules/react/package.json", r#"{ "name": "react", "main": "index.js" }"#);
     w("js/node_modules/react/index.js", "export const version = 'ENGINE_REACT';\n");
-    w("motion/index.tsx", "export const motion = 'MOTION_INDEX';\n");
-    w("motion/ecs.ts", "export const ecs = 'MOTION_ECS';\n");
-    w("motion/prelude.ts", "export const prelude = 'MOTION_PRELUDE';\n");
+    // the fake SDK laid out as the real one (sdk/raea/src under sdk/), with the import names in sdk/tsconfig.base.json's
+    // paths, which is where the resolver reads "raea" and "raea/<module>" from (script.rs, docs/sdk.feature S1d; #90)
+    w("sdk/raea/src/index.tsx", "export * from \"./prelude\";\nexport const motion = 'MOTION_INDEX';\n");
+    w("sdk/raea/src/ecs.ts", "export const ecs = 'MOTION_ECS';\n");
+    w("sdk/raea/src/prelude.ts", "export const prelude = 'MOTION_PRELUDE';\n");
+    w("sdk/tsconfig.base.json", r#"{ "compilerOptions": { "paths": { "raea": ["./raea/src/index.tsx"], "raea/*": ["./raea/src/*"] } } }"#);
     w("lib/aliased.ts", "export const aliased = 'ALIASED';\n");
     // the script's own folder carries another react: the engine's must win
     w("work/node_modules/react/package.json", r#"{ "name": "react", "main": "index.js" }"#);
@@ -125,7 +128,7 @@ import { version } from "react";
 "#);
     let script = raea_bundle::script::Script {
         js: d.join("js"),
-        motion: d.join("motion"),
+        motion: d.join("sdk/raea/src"),
         shell: d.join("nope.ts"),
         aliases: [("~lib".to_string(), d.join("lib/aliased.ts"))].into_iter().collect(),
         stubs: vec!["fs".into()],

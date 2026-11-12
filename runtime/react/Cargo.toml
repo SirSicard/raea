@@ -72,6 +72,8 @@ raea-sys-animate = { path = "../../systems/animate" }
 # Bevy plugins compiled into the engine, each behind a feature (sdk/raea/docs/bevy-plugins.md); none by default
 raea-bevy-plugins = { path = "../../engine/bevy-plugins", optional = true }
 raea-sys-bake = { path = "../../systems/bake" }
+# <BlenderShot> and <GodotShot>'s native calls (blender.shot, godot.shot)
+raea-runtime-shots = { path = "../shots" }
 
 [package.metadata.cargo-shear]
 # raea-io-media is here for its features (h264), which the platform decoders raea-render reads take

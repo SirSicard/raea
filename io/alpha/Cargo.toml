@@ -1,0 +1,24 @@
+[package]
+name = "raea-io-alpha"
+version = "0.1.0"
+edition = "2024"
+license = "FSL-1.1-ALv2"
+publish = false
+description = "Transparent video written natively (docs/capcut.feature CC1): ProRes 4444 and HEVC with alpha through VideoToolbox on Apple, QuickTime Animation and PNG movies everywhere"
+
+[dependencies]
+png = "0.17"
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde_json = "1"
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+# its toll-free bridge for CoreFoundation keys
+raea-io-apple = { path = "../apple" }
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-av-foundation = { version = "0.3", features = ["objc2-core-media", "objc2-core-video", "block2"] }
+objc2-core-media = "0.3"
+objc2-core-video = "0.3"
+objc2-core-foundation = "0.3"
+objc2-video-toolbox = "0.3"
+block2 = "0.6"

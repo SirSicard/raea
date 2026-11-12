@@ -29,6 +29,8 @@ pub mod stream {
         Play { at: f64, looping: bool },
         Pause,
         Muted(bool),
+        /// the element's volume, 0..1: the sound's gain while it isn't muted
+        Volume(f32),
     }
 
     pub struct Stream {

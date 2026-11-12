@@ -81,6 +81,10 @@ fn one(all: &[Vec<Item>], p: &mut Program, row: &mut BTreeMap<String, V>, k: usi
         if all.iter().flatten().any(|i| i.kind == "dof") {
             column(p, row, id, "focus", &its.iter().map(focus_of).collect::<Vec<_>>());
         }
+        // which of the scene's cameras is the piece's, where that's not the first: a cut where it changes (active.rs)
+        if k == 0 {
+            shot_column(p, row, id, &its);
+        }
         let first = &its[0].props;
         if let Some(o) = num(first, "order") {
             row.insert("order".into(), V::N(o));

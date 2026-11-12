@@ -23,6 +23,9 @@ pub struct Node3 {
     /// rows by reference (ZeroHeap: a live 3D frame parsed and copied every part's props)
     pub props: std::sync::Arc<Map<String, Value>>,
     pub shape: Option<std::sync::Arc<str>>,
+    /// an <Instances>' placements, its data-at text (9 numbers a copy, JSON): shared across frames while it's the same
+    /// text, outside props, so a set whose other props change each frame keeps one list, not one a frame (#84)
+    pub at: Option<std::sync::Arc<str>>,
     /// shared: a subtree no commit touched is the last frame's, handed on for an Arc's count (docs/control.feature
     /// FC1b: many_cubes' 10,000 parts were re-read each frame for a camera's move). Build from a Vec with `.into()`
     pub kids: std::sync::Arc<[Node3]>,
@@ -34,6 +37,8 @@ pub struct Item {
     pub kind: &'static str,
     pub props: std::sync::Arc<Map<String, Value>>,
     pub shape: Option<std::sync::Arc<str>>,
+    /// its Node3's `at`
+    pub at: Option<std::sync::Arc<str>>,
     pub material: Option<Node3>,
     pub world: Mat4,
 }
@@ -86,4 +91,18 @@ pub fn filled(track: &[Option<Item>]) -> Vec<Item> {
         }
         last.clone()
     }).collect()
+}
+
+/// An <Entities>' scene (a world's, already in world space) as the meshes it holds, each with its material.
+pub fn entities_nodes(props: &Map<String, Value>) -> Vec<Node3> {
+    let nodes = props.get("scene").and_then(Value::as_array).into_iter().flatten().filter(|n| n["kind"] == "Mesh");
+    nodes
+        .map(|n| {
+            let mesh = n["mesh"].as_object().cloned().unwrap_or_default();
+            let p: Map<String, Value> = ["position", "rotation", "scale"].iter().map(|k| (k.to_string(), n[*k].clone())).collect();
+            let mat: Map<String, Value> = ["color", "roughness", "metalness"].iter().filter_map(|k| Some((k.to_string(), mesh.get(*k)?.clone()))).collect();
+            let material = Node3 { kind: "MeshStandardMaterial".into(), props: std::sync::Arc::new(mat), shape: None, at: None, kids: Vec::new().into() };
+            Node3 { kind: "Mesh".into(), props: std::sync::Arc::new(p), shape: mesh.get("shape").and_then(Value::as_str).map(Into::into), at: None, kids: std::sync::Arc::new([material]) }
+        })
+        .collect()
 }

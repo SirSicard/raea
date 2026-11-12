@@ -9,8 +9,8 @@ const PLACE: [&str; 10] = ["x", "y", "z", "q_x", "q_y", "q_z", "q_w", "scale_x",
 
 impl LiveScene {
     /// `diff(current(f))` for a frame whose parts are all known, without the rows: each known part's changing values worked out into a fixed array and held
-    /// against what was sent in place, as diff holds a row (the same rules: recoloured meshes keyed, the emissive strength
-    /// only where the first frame glows, opacity once seen-through, visible and scale back to 1, lights without visible),
+    /// against what was sent in place, as diff holds a row (the same rules: recoloured meshes keyed, the emissive colour when it
+    /// changes and its strength where the sent colour glows, opacity once seen-through, visible and scale back to 1, lights without visible),
     /// so a frame allocates only for what it changes. None, with nothing changed, when a part is new.
     pub(crate) fn frame_fast(&mut self, f: Shot) -> Option<(Vec<raea_core_program::eval::Tup>, Vec<(String, String)>)> {
         if self.rows.is_empty() {
@@ -61,7 +61,11 @@ impl LiveScene {
                     return None;
                 }
                 // a panel showing another picture (`current` kept the last): the full path, which sends the new src
-                if it.kind == "panel" && self.panel_srcs.get(key.as_str()).map(String::as_str) != it.props.get("src").and_then(Value::as_str) { return None }
+                if it.kind == "panel" && self.panel_srcs.get(key.as_str()).map(|s| &**s) != it.props.get("src").and_then(Value::as_str) { return None }
+                // an <Instances> placed elsewhere (`current` sent its list): the full path, which sends the new one (#85)
+                if let Some(at) = &it.at && self.panel_srcs.get(key.as_str()).is_none_or(|s| !std::sync::Arc::ptr_eq(s, at) && s != at) { return None }
+                // a mesh glowing in another colour than sent (none is black): the full path, which keys it (#106)
+                if it.kind == "mesh" && it.material.as_ref().and_then(|m| m.props.get("emissive")).and_then(Value::as_str).and_then(hex_cow).filter(|e| e != "#000000").as_deref() != self.rows[id].sent.get("emissive").and_then(|v| if let V::S(s) = v { Some(s.as_str()) } else { None }) { return None }
                 parts.push((i, id));
             }
         }
@@ -241,7 +245,7 @@ impl LiveScene {
                         set(&mut want, &mut nw, name, Some(c[k]), false);
                     }
                 }
-                if !r.first.contains_key("emissive") {
+                if !r.sent.contains_key("emissive") || r.sent.get("emissive") == Some(&V::S("#000000".into())) {
                     set(&mut want, &mut nw, "emissive_k", None, false);
                 } else {
                     set(&mut want, &mut nw, "emissive_k", Some(1.0), true);

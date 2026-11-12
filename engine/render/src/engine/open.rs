@@ -43,10 +43,10 @@ impl Engine {
         let mut app = App::new();
         let group = DefaultPlugins
             .set(WindowPlugin { primary_window: None, exit_condition: ExitCondition::DontExit, close_when_requested: false, ..default() })
-            // quiet on a good run: bevy_log's "Could not set global logger" (raea_io_trace owns `log` in a play
-            // or a render, and its records go there, as meant) and a pass-timing readback that missed a frame
-            // (RenderDiagnosticsPlugin's "Failed to download render statistics buffer": one second's bevy_passes lost)
-            .set(bevy::log::LogPlugin { level: bevy::log::Level::WARN, filter: format!("{}bevy_log=off,bevy_asset::io::web=error,bevy_asset::io::source=error,fontdb=error,bevy_render::diagnostic::internal=error", bevy::log::DEFAULT_FILTER), ..default() })
+            // quiet on a good run: bevy_log's "Could not set global logger" (raea_io_trace owns `log` in a play or a render, and its
+            // records go there, as meant), a pass-timing readback that missed a frame (RenderDiagnosticsPlugin's "Failed to download render
+            // statistics buffer": one second's bevy_passes lost) and bevy_time's "did not receive the time from the render world" (raea steps Time by frame)
+            .set(bevy::log::LogPlugin { level: bevy::log::Level::WARN, filter: format!("{}bevy_log=off,bevy_asset::io::web=error,bevy_asset::io::source=error,fontdb=error,bevy_render::diagnostic::internal=error,bevy_time=error", bevy::log::DEFAULT_FILTER), ..default() })
             // glTF models (scene3d) load from the paths their rows name, which are the edit's files wherever they are.
             // Hot reload (Bevy's file_watcher, in the bevy-all build) only when asked, RAEA_BEVY_WATCH=1: a render or a
             // baked play reloading an asset mid-run would draw frames that a render alone doesn't
